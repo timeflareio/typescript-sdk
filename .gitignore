@@ -1,0 +1,8 @@
+src/vendor/
+
+# WASM bundle — fetched from a timeflareio/crypto release by `make wasm-sync`,
+# never built here and never committed.
+wasm/
+
+# Release packaging output
+dist-release/
