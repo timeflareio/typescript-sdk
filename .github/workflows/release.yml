@@ -72,7 +72,7 @@ jobs:
           stage="$(mktemp -d)"
           cp -R dist "${stage}/"
           cp package.json "${stage}/"
-          [ -f README.md ] && cp README.md "${stage}/" || true
+          if [ -f README.md ]; then cp README.md "${stage}/"; fi
           # Restrict the packed fileset to dist/, dropping wasm/ from `files`.
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('${stage}/package.json'));p.files=['dist/'];fs.writeFileSync('${stage}/package.json',JSON.stringify(p,null,2)+'\n')"
           ( cd "${stage}" && npm pack >/dev/null )
