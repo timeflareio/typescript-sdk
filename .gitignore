@@ -1,8 +1,19 @@
-src/vendor/
+# Dependencies and build output. These were ignored by the MONOREPO ROOT, not by
+# this package — so a standalone clone had nothing ignoring them until now.
+node_modules/
+dist/
+dist-release/
 
-# WASM bundle — fetched from a timeflareio/crypto release by `make wasm-sync`,
-# never built here and never committed.
+# WASM bundle: a released artefact from timeflareio/crypto, fetched by
+# `make wasm-sync`. Never built here, never committed.
 wasm/
 
-# Release packaging output
-dist-release/
+# NB: src/vendor/vectors/ is deliberately NOT ignored, though the monorepo
+# ignored it. There it was regenerated from ../testdata/vectors on every
+# `pretest`, so it was ephemeral. Here the corpora come from two other
+# repositories over the network, and committing them is what keeps the test
+# suite hermetic — `make vectors-verify` is the separate, network-based check
+# that the committed copies still match their owning repositories.
+
+# macOS
+.DS_Store

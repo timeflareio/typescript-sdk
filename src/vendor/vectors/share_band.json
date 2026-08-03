@@ -1,0 +1,29 @@
+{
+  "_description": "Guardian-band validation matrix (docs/spec.md 'The [min_shares, max_shares] band'): MinThreshold ≤ threshold ≤ min_shares ≤ max_shares ≤ 32 and max_shares − min_shares < threshold (strict). The chain (x/secrets/types.ValidateShareBand) and every client assert this matrix in CI so the rule cannot drift between implementations. Append-only, like every corpus in this directory: new vectors may be added, existing vectors are never edited or removed. 'reason' on invalid rows is informational — implementations match the verdict, not the text.",
+  "version": 1,
+  "valid": [
+    { "name": "zero-width band at the floors", "threshold": 2, "min_shares": 2, "max_shares": 2 },
+    { "name": "gap at threshold-1 boundary (low threshold)", "threshold": 2, "min_shares": 2, "max_shares": 3 },
+    { "name": "spec worked example", "threshold": 5, "min_shares": 6, "max_shares": 9 },
+    { "name": "min at threshold, widest legal gap", "threshold": 5, "min_shares": 5, "max_shares": 9 },
+    { "name": "max threshold, widest legal gap", "threshold": 16, "min_shares": 16, "max_shares": 31 },
+    { "name": "max_shares at the 32 cap", "threshold": 16, "min_shares": 17, "max_shares": 32 },
+    { "name": "narrow band forced by low threshold", "threshold": 3, "min_shares": 15, "max_shares": 17 },
+    { "name": "zero-width band at the cap", "threshold": 2, "min_shares": 32, "max_shares": 32 },
+    { "name": "default client preset shape (30% clamped by gap)", "threshold": 10, "min_shares": 10, "max_shares": 13 }
+  ],
+  "invalid": [
+    { "name": "threshold below minimum", "threshold": 1, "min_shares": 2, "max_shares": 2, "reason": "threshold < MinThreshold (2)" },
+    { "name": "threshold above maximum", "threshold": 17, "min_shares": 17, "max_shares": 17, "reason": "threshold > MaxThreshold (16)" },
+    { "name": "min below threshold", "threshold": 5, "min_shares": 4, "max_shares": 6, "reason": "min_shares < threshold: a min-sized activation could not reach threshold reveals" },
+    { "name": "inverted band", "threshold": 5, "min_shares": 6, "max_shares": 5, "reason": "max_shares < min_shares" },
+    { "name": "max above the cap", "threshold": 5, "min_shares": 30, "max_shares": 33, "reason": "max_shares > MaxTotalShares (32)" },
+    { "name": "gap equal to threshold (boundary reject)", "threshold": 5, "min_shares": 6, "max_shares": 11, "reason": "max − min must be strictly below threshold" },
+    { "name": "gap above threshold", "threshold": 5, "min_shares": 6, "max_shares": 12, "reason": "max − min must be strictly below threshold" },
+    { "name": "gap equal to low threshold (boundary reject)", "threshold": 2, "min_shares": 3, "max_shares": 5, "reason": "max − min must be strictly below threshold" },
+    { "name": "min below the shares floor", "threshold": 2, "min_shares": 1, "max_shares": 1, "reason": "min_shares < MinShares (2)" },
+    { "name": "min below high threshold", "threshold": 16, "min_shares": 15, "max_shares": 16, "reason": "min_shares < threshold" },
+    { "name": "zero band", "threshold": 5, "min_shares": 0, "max_shares": 0, "reason": "min_shares < MinShares and < threshold" },
+    { "name": "negative min", "threshold": 5, "min_shares": -1, "max_shares": 4, "reason": "min_shares < MinShares and < threshold" }
+  ]
+}

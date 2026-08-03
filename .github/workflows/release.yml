@@ -1,0 +1,131 @@
+name: Release
+
+# Releases are deliberate: pushing a vX.Y.Z tag is the only trigger.
+#
+# TWO tarballs, because this package has two consumers wanting different things
+# and one artefact cannot serve both:
+#
+#   timeflare-sdk-<tag>.tgz            dist only, npm-pack shaped, DETERMINISTIC
+#   timeflare-sdk-examples-<tag>.tar.gz  dist + examples + wasm, for the e2e harness
+#
+# The determinism of the first is a hard requirement, not a nicety. The mobile
+# client vendors it and commits a lockfile whose integrity hash covers it, so a
+# tarball that differs byte-for-byte between builds would break that lockfile on
+# every release. tsc output is reproducible and npm normalises tarball mtimes —
+# but wasm-opt output is NOT byte-reproducible, which is exactly why wasm is
+# excluded from that artefact and shipped in the second one instead.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify, build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Enforce the version policy
+        run: |
+          set -euo pipefail
+          case "${GITHUB_REF_NAME}" in
+            v0.*) echo "✅ ${GITHUB_REF_NAME} is within the 0.x policy" ;;
+            *)
+              echo "::error::${GITHUB_REF_NAME} crosses out of 0.x. Registry publication and the compatibility promise that implies are deliberately deferred — see docs/planning/PENDING_RELEASE_STRATEGY_PLAN.md."
+              exit 1
+              ;;
+          esac
+
+      - run: npm ci
+
+      - name: Fetch the pinned WASM bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make wasm-sync
+
+      # Full gate before publishing: lint, types, both vendored corpora checked
+      # against their owning repositories, then the suite.
+      - name: Verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make verify
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make test
+
+      - name: Pack the deterministic dist tarball
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          stage="$(mktemp -d)"
+          cp -R dist "${stage}/"
+          cp package.json "${stage}/"
+          [ -f README.md ] && cp README.md "${stage}/" || true
+          # Restrict the packed fileset to dist/, dropping wasm/ from `files`.
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('${stage}/package.json'));p.files=['dist/'];fs.writeFileSync('${stage}/package.json',JSON.stringify(p,null,2)+'\n')"
+          ( cd "${stage}" && npm pack >/dev/null )
+          mv "${stage}"/timeflare-sdk-*.tgz "dist-release/timeflare-sdk-${GITHUB_REF_NAME}.tgz"
+
+      - name: Pack the examples bundle
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d)/timeflare-sdk"
+          mkdir -p "${stage}"
+          cp -R dist examples wasm package.json "${stage}/"
+          tar -czf "dist-release/timeflare-sdk-examples-${GITHUB_REF_NAME}.tar.gz" \
+            -C "$(dirname "${stage}")" timeflare-sdk
+          ( cd dist-release && sha256sum ./* > "timeflare-sdk-${GITHUB_REF_NAME}-checksums.txt" )
+          ls -la dist-release/
+
+      - name: Compose release notes
+        run: |
+          set -euo pipefail
+          crypto="$(grep -E '^CRYPTO_VERSION=' versions.env | cut -d= -f2)"
+          chain="$(grep -E '^CHAIN_VERSION=' versions.env | cut -d= -f2)"
+          {
+            echo "## Artefacts"
+            echo
+            echo "| Artefact | For |"
+            echo "|---|---|"
+            echo "| \`timeflare-sdk-${GITHUB_REF_NAME}.tgz\` | consumers vendoring the package — dist only, byte-deterministic so a committed lockfile's integrity hash stays valid |"
+            echo "| \`timeflare-sdk-examples-${GITHUB_REF_NAME}.tar.gz\` | the chain's e2e harness — dist + examples + WASM |"
+            echo
+            echo "Two tarballs because the consumers want different things: the mobile"
+            echo "client needs a reproducible artefact, and \`wasm-opt\` output is not"
+            echo "byte-reproducible, so WASM ships only in the second."
+            echo
+            echo "Not published to a registry — deliberately deferred."
+            echo
+            echo "## Assembled from"
+            echo
+            echo "| Source | Version |"
+            echo "|---|---|"
+            echo "| \`timeflareio/crypto\` (WASM + primitive vectors) | \`${crypto}\` |"
+            echo "| \`timeflareio/chain\` (protobufs + chain-semantics vectors) | \`${chain}\` |"
+            echo
+            echo "\`make verify\` passed on this commit, so both vendored corpora were"
+            echo "checked against those repositories — crypto's against its SHA-256"
+            echo "manifest, the chain's against its tag."
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            dist-release/*

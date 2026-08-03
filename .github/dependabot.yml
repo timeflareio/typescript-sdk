@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # cosmjs moves as a set; a partial bump mixes protocol encoders across
+      # versions, which is the sort of drift the wire contract exists to prevent.
+      cosmjs:
+        patterns:
+          - "@cosmjs/*"
+      routine:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@cosmjs/*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
