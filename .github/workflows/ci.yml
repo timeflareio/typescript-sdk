@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run actionlint
+        run: |
+          bash <(curl -sSf https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  sdk:
+    name: SDK (verify + test)
+    needs: workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # No Rust toolchain here. The WASM bundle is a released artefact from
+      # timeflareio/crypto, so contributors to this package need only Node —
+      # which is the point of publishing it rather than building it downstream.
+      - name: Fetch the pinned WASM bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make wasm-sync
+
+      # vectors-verify re-reads both owning repositories, so this proves the
+      # vendored copies still match crypto's manifest and the chain's tag —
+      # not merely that some files are present.
+      - name: Verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make verify
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make test
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high

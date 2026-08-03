@@ -1,0 +1,154 @@
+{
+  "description": "Creator-settable dial bounds on MsgUserRequestGuardians, pinned across implementations. The chain asserts these through ValidateBasic AND the keeper's context-dependent reveal-window check (x/secrets/keeper/dial_vectors_test.go); the TypeScript SDK asserts them through its DIALS descriptor table (dials.test.ts). A client that offers a value the chain rejects, or refuses one the chain accepts, fails its own suite. The commit window is NOT a dial: it is the protocol constant CommitTimeoutBlocks (50), which is why the reveal-offset floor is the constant 100 (commit window + 50-block buffer) rather than a computation. ValidateBasic checks every bound here including that floor; the keeper additionally requires the whole window to sit inside the horizon, which needs the block height and so stays keeper-only. Clients mirror the STRICTER (keeper) rule, because offering a value the handler will reject is the defect.",
+  "bounds": {
+    "threshold": { "min": 2, "max": 16 },
+    "min_shares": { "min": 2, "max": 32 },
+    "max_shares": { "absolute_max": 32, "gap_rule": "max_shares - min_shares < threshold" },
+    "bump_hundredths": { "min": 100, "max": 1000 },
+    "reveal_start_offset_blocks": {
+      "min": 100,
+      "rule": "min = CommitTimeoutBlocks (50) + 50 buffer; a constant, not derived from a creator input",
+      "max": 5256000
+    },
+    "reveal_duration_blocks": { "min": 100, "max": 14400 },
+    "reveal_horizon_blocks": {
+      "max": 5256000,
+      "rule": "start_offset + duration <= 5256000"
+    }
+  },
+  "cases": [
+    {
+      "name": "minimal legal draft",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "standard tier, thirty days out",
+      "threshold": 3, "min_shares": 5, "max_shares": 7, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 432000, "reveal_duration_blocks": 300,
+      "valid": true
+    },
+    {
+      "name": "band exactly at the gap bound",
+      "threshold": 3, "min_shares": 5, "max_shares": 7, "bump_hundredths": 200,
+      "reveal_start_offset_blocks": 110, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "widest legal band below the ceiling",
+      "threshold": 16, "min_shares": 16, "max_shares": 31, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "band pinned at the 32 ceiling",
+      "threshold": 16, "min_shares": 32, "max_shares": 32, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "maximum bump",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 1000,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "maximum reveal duration",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 14400,
+      "valid": true
+    },
+    {
+      "name": "window ending exactly on the horizon",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 5255900, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+    {
+      "name": "offset exactly at the reveal-offset floor",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 100, "reveal_duration_blocks": 100,
+      "valid": true
+    },
+
+    {
+      "name": "threshold below the floor",
+      "threshold": 1, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "threshold < 2"
+    },
+    {
+      "name": "threshold above the ceiling",
+      "threshold": 17, "min_shares": 17, "max_shares": 17, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "threshold > 16"
+    },
+    {
+      "name": "min_shares below the floor",
+      "threshold": 2, "min_shares": 1, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "min_shares < 2"
+    },
+    {
+      "name": "min_shares below threshold",
+      "threshold": 5, "min_shares": 4, "max_shares": 6, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "min_shares < threshold"
+    },
+    {
+      "name": "max_shares below min_shares",
+      "threshold": 3, "min_shares": 7, "max_shares": 5, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "max_shares < min_shares"
+    },
+    {
+      "name": "max_shares above the absolute ceiling",
+      "threshold": 4, "min_shares": 32, "max_shares": 33, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "max_shares > 32"
+    },
+    {
+      "name": "band width equals threshold, violating the strict gap bound",
+      "threshold": 3, "min_shares": 5, "max_shares": 8, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "max_shares - min_shares >= threshold"
+    },
+    {
+      "name": "bump below the floor",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 99,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "bump < 100"
+    },
+    {
+      "name": "bump above the ceiling",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 1001,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "bump > 1000"
+    },
+    {
+      "name": "reveal offset one block below the floor",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 99, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "start_offset < 100 (the fixed commit window plus the buffer)"
+    },
+    {
+      "name": "reveal duration too short",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 99,
+      "valid": false, "reason": "duration < 100"
+    },
+    {
+      "name": "reveal duration too long",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 14401,
+      "valid": false, "reason": "duration > 14400"
+    },
+    {
+      "name": "window ends one block past the horizon",
+      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 5255901, "reveal_duration_blocks": 100,
+      "valid": false, "reason": "start_offset + duration > 5256000 — rejected by the keeper, not by ValidateBasic"
+    }
+  ]
+}

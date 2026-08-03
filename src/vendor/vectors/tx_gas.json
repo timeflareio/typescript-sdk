@@ -1,0 +1,166 @@
+{
+  "description": "Measured creator-transaction gas, swept across the guardian band at two payload sizes on a 36-guardian devnet (27 July 2026). The SDK declares a model fitted to these points with ~25% headroom; gas-model.test.ts fails if the model ever declares less than a measured point, which is the failure that would put a creator's transaction out of gas. Both phases scale with the band — phase 1 walks the candidate set and freezes one bond per selected guardian, phase 2 carries one share envelope each plus the payload stored once — so neither can be expressed as a flat figure. Re-measure after any change to selection, the secret record, or the share-distribution path; do NOT widen the margin to accommodate a regression.",
+  "measured_on": "2026-07-29 (phase 1); 2026-07-27 (phase 2, cancel)",
+  "conditions": {
+    "registered_guardians": "40 for phase 1 (29 July 2026); 36 for phase 2 and cancel (27 July 2026)",
+    "gas_price": "0.1uveil (consensus floor)",
+    "note": "The phase-1 base covers candidate enumeration, which reads the ELIGIBLE guardian set — no longer every registration ever made. Enumeration range-reads the eligibility index bounded by available_until >= reveal_end_block, so registrations that cannot be selected (lapsed ones included) cost nothing at all: 400 lapsed registrations add zero gas. What remains is 360 gas per ELIGIBLE guardian, measured at 40. That term is still treated as constant by the declared model, so the ~25% margin is finite headroom, not immunity — see eligible_set_boundary.",
+    "cancel_measurement": "Cancel is measured against a live chain like the two creator phases. An earlier attempt used a keeper gas meter and read ~45% low, because the test fixture injects a mock bank keeper while the real handler sends coins once per active guardian — that under-read shipped two out-of-gas failures. A 32-guardian cancel needs ~2.07M gas (0.207 VEIL at the floor price); the consensus block gas limit is 75M (spec.md Network Configuration), so it is includable with ~36x headroom.",
+    "eligible_set_boundary": "Phase 1 begins aborting out of gas once the eligible set grows past roughly 139 guardians at max_shares=2, 154 at 7, and 228 at 32 - the point where 360 gas per eligible guardian exhausts the declared margin. Against the model declared before the eligibility index (250,000 + 5,500 x max_shares) the same boundary sat at 62-79 REGISTERED guardians, so band for band this is a 2.2-2.9x improvement - deliberately NOT quoted as the 5.8x drop in per-guardian cost (2,092 -> 360), because the same re-measurement lowered the declared base by a third and absolute headroom shrank with it. The change of driver is the larger win: the boundary is reached by healthy participation rather than dead registrations accumulating forever, and a lapsed registration no longer moves it at all. NOT a closed problem. Widening the margin is the wrong fix: the creator pays the declared limit, so it taxes every creator today to defer the boundary. The real fix is for the declaration to scale with the eligible count. Query/Guardians already returns every field the predicate needs, but there is no eligible-count query and no server-side filter, so the client must page the registry and apply the predicate itself - the same O(registered) walk, moved off-chain where it is unmetered. A client-model change needing its own plan.",
+    "phase_1_measurement": "Swept max_shares 2..32 at bump 100, min_shares = max_shares (so max_shares is the only variable), reveal offset 200 (>= commit timeout 110 + 50 buffer), duration 100. gas_used read from the committed transaction, so ante costs are included exactly as a creator pays them."
+  },
+  "fit": {
+    "request_guardians": {
+      "base": 133402,
+      "per_share": 4336,
+      "basis": "full-transaction gas_used from a live 1s-block devnet with 40 registered guardians, all eligible (29 July 2026). Envelope fit: the per-share slope from the band extremes, then the largest base no measured point exceeds."
+    },
+    "distribute_shares": {
+      "base": 72166,
+      "per_share": 17160,
+      "per_byte": 40
+    },
+    "cancel_secret": {
+      "base": 90731,
+      "per_active_guardian": 61775,
+      "basis": "full-transaction gas_used from a live chain — NOT the keeper harness, whose mock bank keeper reads ~45% low on this handler"
+    }
+  },
+  "declared": {
+    "request_guardians": {
+      "base": 167000,
+      "per_share": 5400
+    },
+    "distribute_shares": {
+      "base": 95000,
+      "per_share": 21500,
+      "per_byte": 50
+    },
+    "cancel_secret": {
+      "base": 120000,
+      "per_active_guardian": 80000
+    }
+  },
+  "request_guardians": [
+    {
+      "max_shares": 2,
+      "gas_used": 142034
+    },
+    {
+      "max_shares": 3,
+      "gas_used": 146368
+    },
+    {
+      "max_shares": 4,
+      "gas_used": 150702
+    },
+    {
+      "max_shares": 7,
+      "gas_used": 163704
+    },
+    {
+      "max_shares": 12,
+      "gas_used": 185434
+    },
+    {
+      "max_shares": 16,
+      "gas_used": 202770
+    },
+    {
+      "max_shares": 20,
+      "gas_used": 220106
+    },
+    {
+      "max_shares": 24,
+      "gas_used": 237442
+    },
+    {
+      "max_shares": 28,
+      "gas_used": 254778
+    },
+    {
+      "max_shares": 32,
+      "gas_used": 272114
+    }
+  ],
+  "distribute_shares": [
+    {
+      "max_shares": 2,
+      "ciphertext_bytes": 152,
+      "gas_used": 112564
+    },
+    {
+      "max_shares": 16,
+      "ciphertext_bytes": 152,
+      "gas_used": 352828
+    },
+    {
+      "max_shares": 32,
+      "ciphertext_bytes": 152,
+      "gas_used": 627340
+    },
+    {
+      "max_shares": 2,
+      "ciphertext_bytes": 4216,
+      "gas_used": 275124
+    },
+    {
+      "max_shares": 4,
+      "ciphertext_bytes": 4216,
+      "gas_used": 309438
+    },
+    {
+      "max_shares": 8,
+      "ciphertext_bytes": 4216,
+      "gas_used": 378099
+    },
+    {
+      "max_shares": 12,
+      "ciphertext_bytes": 4216,
+      "gas_used": 446760
+    },
+    {
+      "max_shares": 16,
+      "ciphertext_bytes": 4216,
+      "gas_used": 515388
+    },
+    {
+      "max_shares": 20,
+      "ciphertext_bytes": 4216,
+      "gas_used": 584016
+    },
+    {
+      "max_shares": 24,
+      "ciphertext_bytes": 4216,
+      "gas_used": 652644
+    },
+    {
+      "max_shares": 28,
+      "ciphertext_bytes": 4216,
+      "gas_used": 721272
+    },
+    {
+      "max_shares": 32,
+      "ciphertext_bytes": 4216,
+      "gas_used": 789900
+    }
+  ],
+  "cancel_secret": [
+    {
+      "active_guardians": 2,
+      "gas_used": 214281
+    },
+    {
+      "active_guardians": 8,
+      "gas_used": 583581
+    },
+    {
+      "active_guardians": 16,
+      "gas_used": 1075926
+    },
+    {
+      "active_guardians": 32,
+      "gas_used": 2067532
+    }
+  ]
+}

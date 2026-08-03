@@ -1,0 +1,18 @@
+{
+  "_description": "Creation-fee derivation matrix (docs/spec.md 'Creation Fee'): fee = max(floor, P × bps(distance) ÷ 10,000) with bps linear from 1,000 at zero distance to 500 at 432,000 blocks (flat beyond), truncating integer division, floor = 60,000 uveil (600,000 gas at the 0.1 uveil/gas consensus floor). The chain (x/secrets/types.CreationFee) and every client cost estimator assert this matrix in CI so the fee cannot drift between implementations. pool_uveil is the FEE BASE — the value the curve is applied to. Since the guardian cost-recovery change (July 2026) that base is the pool's TIME component (rate x distance x max_shares x bump), not the whole pool: the curve prices a selection draw and is never charged on the gas reimbursements the creator also funds. The arithmetic these vectors pin is unchanged, so they remain valid verbatim; the field keeps its name because this corpus is append-only; distance_blocks the secret's distance; fee_uveil the exact expected fee; regime whether the floor or the percentage curve priced it. Append-only, like every corpus in this directory: new vectors may be added, existing vectors are never edited or removed.",
+  "version": 1,
+  "vectors": [
+    { "name": "zero distance, zero pool — floor binds", "pool_uveil": "0", "distance_blocks": 0, "fee_uveil": "60000", "regime": "floor" },
+    { "name": "1-day sealed bid (3 guardians, bump 1)", "pool_uveil": "43200", "distance_blocks": 14400, "fee_uveil": "60000", "regime": "floor" },
+    { "name": "7-day announcement (5 guardians, bump 1)", "pool_uveil": "504000", "distance_blocks": 100800, "fee_uveil": "60000", "regime": "floor" },
+    { "name": "30-day dead-man's handle (5 guardians, bump 2)", "pool_uveil": "4320000", "distance_blocks": 432000, "fee_uveil": "216000", "regime": "percent" },
+    { "name": "70-day escrow (9 guardians, bump 5)", "pool_uveil": "45000000", "distance_blocks": 1000000, "fee_uveil": "2250000", "regime": "percent" },
+    { "name": "1-year maximum (32 guardians, bump 10)", "pool_uveil": "1681920000", "distance_blocks": 5256000, "fee_uveil": "84096000", "regime": "percent" },
+    { "name": "curve end exactly — bps floor 500", "pool_uveil": "10000000", "distance_blocks": 432000, "fee_uveil": "500000", "regime": "percent" },
+    { "name": "truncating bps interior point (d=318,000 → bps 632)", "pool_uveil": "1590000", "distance_blocks": 318000, "fee_uveil": "100488", "regime": "percent" },
+    { "name": "truncating bps interior point (d=317,000 → bps 634)", "pool_uveil": "1585000", "distance_blocks": 317000, "fee_uveil": "100489", "regime": "percent" },
+    { "name": "exact floor/curve tie goes to percent regime", "pool_uveil": "1200000", "distance_blocks": 432000, "fee_uveil": "60000", "regime": "percent" },
+    { "name": "one uveil above the tie", "pool_uveil": "1200020", "distance_blocks": 432000, "fee_uveil": "60001", "regime": "percent" },
+    { "name": "just below the tie — floor binds", "pool_uveil": "1199980", "distance_blocks": 432000, "fee_uveil": "60000", "regime": "floor" }
+  ]
+}

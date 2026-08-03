@@ -1,0 +1,82 @@
+{
+  "name": "timeflare-sdk",
+  "version": "0.1.0",
+  "description": "JavaScript SDK for Timeflare client-side operations",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "wasm/"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "e2e": "node examples/secret-lifecycle.js",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist wasm node_modules",
+    "proto:gen": "echo 'Use: make proto-sync (fetches the pinned chain protos)' && exit 1"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.13.0",
+    "@cosmjs/crypto": "^0.39.0",
+    "@cosmjs/encoding": "^0.39.0",
+    "@cosmjs/proto-signing": "^0.39.0",
+    "@cosmjs/stargate": "^0.39.0",
+    "@noble/hashes": "^2.2.0",
+    "bech32": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/google-protobuf": "^3.15.12",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.64.0",
+    "eslint": "^10.8.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "ts-proto": "^2.12.0",
+    "typescript": "^6.0.3"
+  },
+  "keywords": [
+    "timeflare",
+    "crypto",
+    "wasm",
+    "shamir-secret-sharing",
+    "threshold-cryptography",
+    "hmac-verification",
+    "encrypted-shares",
+    "blockchain",
+    "cosmos",
+    "time-locked-secrets"
+  ],
+  "author": "Timeflare Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timeflareio/typescript-sdk.git"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "bugs": {
+    "url": "https://github.com/timeflareio/typescript-sdk/issues"
+  },
+  "homepage": "https://github.com/timeflareio/typescript-sdk#readme",
+  "security": {
+    "url": "https://github.com/timeflareio/typescript-sdk/security/policy"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./wasm": {
+      "types": "./dist/backends/wasm.d.ts",
+      "default": "./dist/backends/wasm.js"
+    }
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
+  }
+}
