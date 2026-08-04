@@ -3,6 +3,13 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with
 code in this repository.
 
+**It is not the whole picture.** The project-wide rules — the working agreement,
+the writing conventions (British English, VEIL is a token, never name the owner),
+the plan-first mandate, specification authority, and how a change crosses a
+repository boundary — are stated once in the workspace root `CLAUDE.md`, at
+`~/dev/timeflareio/CLAUDE.md`, which loads alongside this file. Read it if you
+are in a checkout that cannot see it.
+
 ## Project Overview
 
 **timeflare TypeScript SDK** is the client library for the timeflare protocol:
@@ -74,42 +81,12 @@ Two tarballs per tag, because the consumers differ:
 Registry publication is deliberately deferred. See
 `docs/planning/PENDING_RELEASE_STRATEGY_PLAN.md`.
 
-## 📋 Specification Authority
+## Specific to this repository
 
-`docs/spec.md` **in the chain repository** is the single source of truth for
-protocol behaviour. `docs/guides/CLIENT_CONVENTIONS.md` here covers client-side
-conventions specifically, and defers to the spec wherever they meet.
-
-If the spec is silent on something this package needs, **stop** and ask the owner
-to clarify it. Do not infer protocol behaviour from this package's existing code
-— the code may be what is wrong.
-
-## 🚨 Plan-First Workflow (mandatory — everything)
-
-All work is executed from an approved plan in `docs/planning/`. Discussion is not
-approval — propose, wait for the ruling, fold it into a plan, then execute. The
-only exception is a change the owner explicitly requests in the moment, and even
-then the scope is exactly what was asked.
-
-## Important Instructions for Claude
-
-- Do what has been asked; nothing more, nothing less
-- NEVER create files unless explicitly asked to implement or code a solution
-- When asked to "elaborate", "explain", or give "feedback", give verbal
-  explanations only
-- ALWAYS prefer editing existing files over creating new ones
-- **🚨 When asked to create a "plan", ONLY create the plan document**
-- **Always wait for explicit approval** before moving from planning to
-  implementation
-- **🚨 Keep the architecture minimal.** No new component without arguing the case
-  and getting explicit confirmation first
-- NEVER create code in production code spaces purely for the purpose of tests
-- **Documentation Language**: British English throughout, `-ise`/`-our`/`-sation`
-- **🚨 VEIL is a token, never money.** Never "money", "cash", "funds" or
-  "payment" — say "token", "VEIL", "uveil", "balance", "amount", "fee", "cost",
-  "bond", "reward" or "rebate". Describing a token as money makes a regulatory
-  claim the project does not make.
-- **🚨 NEVER name the owner.** No personal name anywhere — code, comments, docs,
-  plans, commit messages or fixtures. Decisions are attributed to **"the owner"**.
-  This covers given name, surname, handle, email, and machine paths embedding a
-  username.
+- **The spec is not here.** `docs/spec.md` in the chain repository is the
+  authority for protocol behaviour; `docs/guides/CLIENT_CONVENTIONS.md` here
+  covers client-side conventions only, and defers to the spec wherever they meet.
+  The rules for consulting it are in the workspace root `CLAUDE.md` — including
+  the one that bites hardest for a consumer: never infer protocol behaviour from
+  this package's existing code, because the code may be what is wrong.
+- Plans live in `docs/planning/`, per its `README.md`.
