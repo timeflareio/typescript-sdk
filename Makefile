@@ -25,8 +25,6 @@ CRYPTO_VECTORS := low_order_keys
 CHAIN_VECTORS  := client_conventions creation_fee dials share_band tx_gas wallet_derivation
 VECTORS_DIR    := src/vendor/vectors
 
-CHAIN_RAW := https://raw.githubusercontent.com/timeflareio/chain
-
 ##@ Testing
 
 .PHONY: test
@@ -77,28 +75,43 @@ clean-wasm: ## Remove the fetched WASM bundle
 	@rm -rf wasm
 
 ## refresh the vendored vector corpora from their owning repositories
+#
+# Both corpora arrive the same way — release tarball plus per-file SHA-256
+# manifest — so there is one mechanism to understand rather than one per
+# upstream. Each is unpacked into its own directory: the two corpora are disjoint
+# by design (§5.2 of the migration plan), but a shared directory would make this
+# silently depend on that, and a future overlap would resolve to whichever file
+# `find` reached first.
 vectors-sync:
 	@set -e; \
 	mkdir -p $(VECTORS_DIR); \
-	echo "📐 Primitive vectors from timeflareio/crypto@$(CRYPTO_VERSION)"; \
 	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	mkdir -p "$$tmp/crypto" "$$tmp/chain"; \
+	echo "📐 Primitive vectors from timeflareio/crypto@$(CRYPTO_VERSION)"; \
 	gh release download "$(CRYPTO_VERSION)" --repo timeflareio/crypto \
 		--pattern 'timeflare-crypto-vectors-*.tar.gz' \
-		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp"; \
-	tar -xzf "$$tmp"/timeflare-crypto-vectors-*.tar.gz -C "$$tmp"; \
+		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp/crypto"; \
+	tar -xzf "$$tmp"/crypto/timeflare-crypto-vectors-*.tar.gz -C "$$tmp/crypto"; \
 	for v in $(CRYPTO_VECTORS); do \
-		src=$$(find "$$tmp" -name "$$v.json" -print -quit); \
+		src=$$(find "$$tmp/crypto" -name "$$v.json" -print -quit); \
 		[ -n "$$src" ] || { echo "❌ $$v.json absent from the crypto corpus"; exit 1; }; \
-		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/timeflare-crypto-vectors-*.sha256 | awk '{print $$1}'); \
+		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/crypto/*.sha256 | awk '{print $$1}'); \
 		got=$$(shasum -a 256 "$$src" | awk '{print $$1}'); \
 		[ "$$want" = "$$got" ] || { echo "❌ $$v.json fails crypto's manifest"; exit 1; }; \
 		cp "$$src" "$(VECTORS_DIR)/$$v.json"; \
 	done; \
 	echo "📐 Chain-semantics vectors from timeflareio/chain@$(CHAIN_VERSION)"; \
+	gh release download "$(CHAIN_VERSION)" --repo timeflareio/chain \
+		--pattern 'timeflare-chain-vectors-*.tar.gz' \
+		--pattern 'timeflare-chain-vectors-*.sha256' --dir "$$tmp/chain"; \
+	tar -xzf "$$tmp"/chain/timeflare-chain-vectors-*.tar.gz -C "$$tmp/chain"; \
 	for v in $(CHAIN_VECTORS); do \
-		curl -sSfL --retry 3 --retry-delay 2 --retry-all-errors \
-			-o "$(VECTORS_DIR)/$$v.json" \
-			"$(CHAIN_RAW)/$(CHAIN_VERSION)/testdata/vectors/$$v.json"; \
+		src=$$(find "$$tmp/chain" -name "$$v.json" -print -quit); \
+		[ -n "$$src" ] || { echo "❌ $$v.json absent from the chain corpus"; exit 1; }; \
+		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/chain/*.sha256 | awk '{print $$1}'); \
+		got=$$(shasum -a 256 "$$src" | awk '{print $$1}'); \
+		[ "$$want" = "$$got" ] || { echo "❌ $$v.json fails the chain's manifest"; exit 1; }; \
+		cp "$$src" "$(VECTORS_DIR)/$$v.json"; \
 	done; \
 	echo "✅ Corpora synced — review the diff, then run 'make test'"
 
@@ -114,21 +127,30 @@ vectors-verify:
 		echo "   Run 'make vectors-sync'."; exit 1; \
 	fi; \
 	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	mkdir -p "$$tmp/crypto" "$$tmp/chain"; \
 	fail=0; \
 	gh release download "$(CRYPTO_VERSION)" --repo timeflareio/crypto \
-		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp" >/dev/null 2>&1 || { \
+		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp/crypto" >/dev/null 2>&1 || { \
 		echo "❌ could not read crypto@$(CRYPTO_VERSION)'s manifest"; exit 1; }; \
+	gh release download "$(CHAIN_VERSION)" --repo timeflareio/chain \
+		--pattern 'timeflare-chain-vectors-*.sha256' --dir "$$tmp/chain" >/dev/null 2>&1 || { \
+		echo "❌ could not read chain@$(CHAIN_VERSION)'s vectors manifest."; \
+		echo "   Does that tag carry a release? Chain tags before v0.0.2 do not."; exit 1; }; \
 	for v in $(CRYPTO_VECTORS); do \
-		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/*.sha256 | awk '{print $$1}'); \
+		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/crypto/*.sha256 | awk '{print $$1}'); \
+		if [ -z "$$want" ]; then \
+			echo "❌ $$v.json is absent from crypto@$(CRYPTO_VERSION)'s manifest"; fail=1; continue; \
+		fi; \
 		got=$$(shasum -a 256 "$(VECTORS_DIR)/$$v.json" | awk '{print $$1}'); \
 		[ "$$want" = "$$got" ] || { echo "❌ $$v.json differs from crypto@$(CRYPTO_VERSION)"; fail=1; }; \
 	done; \
 	for v in $(CHAIN_VECTORS); do \
-		curl -sSfL --retry 3 -o "$$tmp/$$v.json" \
-			"$(CHAIN_RAW)/$(CHAIN_VERSION)/testdata/vectors/$$v.json" || { \
-			echo "❌ could not read chain@$(CHAIN_VERSION)'s $$v.json"; fail=1; continue; }; \
-		cmp -s "$$tmp/$$v.json" "$(VECTORS_DIR)/$$v.json" || { \
-			echo "❌ $$v.json differs from chain@$(CHAIN_VERSION)"; fail=1; }; \
+		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/chain/*.sha256 | awk '{print $$1}'); \
+		if [ -z "$$want" ]; then \
+			echo "❌ $$v.json is absent from chain@$(CHAIN_VERSION)'s manifest"; fail=1; continue; \
+		fi; \
+		got=$$(shasum -a 256 "$(VECTORS_DIR)/$$v.json" | awk '{print $$1}'); \
+		[ "$$want" = "$$got" ] || { echo "❌ $$v.json differs from chain@$(CHAIN_VERSION)"; fail=1; }; \
 	done; \
 	if [ $$fail -ne 0 ]; then \
 		echo "   Run 'make vectors-sync' — never hand-edit $(VECTORS_DIR)."; \
