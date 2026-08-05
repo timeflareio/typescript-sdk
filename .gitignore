@@ -5,8 +5,6 @@ dist/
 dist-release/
 
 # WASM bundle: a released artefact from timeflareio/crypto, fetched by
-# `make wasm-sync`. Never built here, never committed.
-wasm/
 
 # NB: src/vendor/vectors/ is deliberately NOT ignored, though the monorepo
 # ignored it. There it was regenerated from ../testdata/vectors on every

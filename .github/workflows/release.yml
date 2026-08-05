@@ -63,18 +63,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Fetch the pinned WASM bundle
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: make wasm-sync
-
-      # Full gate before publishing: lint, types, both vendored corpora checked
-      # against their owning repositories, then the suite.
-      - name: Verify
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: make verify
-
       - name: Build
         run: npm run build
 
@@ -123,7 +111,7 @@ jobs:
           set -euo pipefail
           stage="$(mktemp -d)/timeflare-sdk"
           mkdir -p "${stage}"
-          cp -R dist examples wasm package.json "${stage}/"
+          cp -R dist examples package.json "${stage}/"
           tar -czf "dist-release/timeflare-sdk-examples-${GITHUB_REF_NAME}.tar.gz" \
             -C "$(dirname "${stage}")" timeflare-sdk
           ( cd dist-release && sha256sum ./* > "timeflare-sdk-${GITHUB_REF_NAME}-checksums.txt" )
@@ -132,7 +120,7 @@ jobs:
       - name: Compose release notes
         run: |
           set -euo pipefail
-          crypto="$(grep -E '^CRYPTO_VERSION=' versions.env | cut -d= -f2)"
+          crypto="$(node -p "require('./package.json').dependencies['@timeflareio/crypto']" | sed -E 's|.*/download/([^/]+)/.*|\1|')"
           chain="$(grep -E '^CHAIN_VERSION=' versions.env | cut -d= -f2)"
           {
             echo "## Artefacts"

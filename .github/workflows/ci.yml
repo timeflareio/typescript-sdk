@@ -35,17 +35,12 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # No Rust toolchain here. The WASM bundle is a released artefact from
-      # timeflareio/crypto, so contributors to this package need only Node —
-      # which is the point of publishing it rather than building it downstream.
-      - name: Fetch the pinned WASM bundle
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: make wasm-sync
+      # No Rust toolchain here, and nothing to fetch: the WASM bundle arrives as
+      # the @timeflareio/crypto dependency that `npm ci` above installed, with the
+      # lockfile's integrity hash covering it. Contributors need only Node.
 
-      # vectors-verify re-reads both owning repositories, so this proves the
-      # vendored copies still match crypto's manifest and the chain's tag —
-      # not merely that some files are present.
+      # vectors-verify re-reads the chain's release, so this proves the vendored
+      # copies still match its manifest — not merely that some files are present.
       - name: Verify
         env:
           GH_TOKEN: ${{ github.token }}

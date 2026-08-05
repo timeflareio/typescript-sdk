@@ -24,6 +24,7 @@
     "@cosmjs/proto-signing": "^0.39.0",
     "@cosmjs/stargate": "^0.39.0",
     "@noble/hashes": "^2.2.0",
+    "@timeflareio/crypto": "https://github.com/timeflareio/crypto/releases/download/v0.0.2/timeflare-crypto-wasm-v0.0.2.tgz",
     "bech32": "^2.0.0"
   },
   "devDependencies": {

@@ -17,27 +17,31 @@ creating secrets, distributing shares to guardians, reconstructing, and
 recipient discovery.
 
 It implements **none of the protocol itself**. It is an assembly of three things
-owned elsewhere, each pinned in `versions.env`:
+owned elsewhere, and they arrive by two different routes:
 
-| What | From | Fetched by |
-|---|---|---|
-| primitives (WASM) | `timeflareio/crypto` | `make wasm-sync` |
-| wire format (`src/generated/`) | `timeflareio/chain` protobufs | `make proto-sync` |
-| conformance vectors | **both** repositories | `make vectors-sync` |
+| What | From | How it arrives | Pinned in |
+|---|---|---|---|
+| primitives (WASM) | `timeflareio/crypto` | the `@timeflareio/crypto` dependency | `package.json` + lockfile |
+| primitive vectors | `timeflareio/crypto` | inside that same dependency | `package.json` + lockfile |
+| wire format (`src/generated/`) | `timeflareio/chain` protobufs | `make proto-sync`, committed | `versions.env` |
+| chain-semantics vectors | `timeflareio/chain` | `make vectors-sync`, committed | `versions.env` |
 
-That last row is the one to hold in mind: this package sits downstream of both,
-so it vendors from both.
+The distinction to hold in mind: what npm can express is a dependency, and npm
+verifies it. What it cannot — generated code and a corpus published as a release
+tarball — is fetched by make and pinned in `versions.env`.
 
 ## 🚨 Never hand-edit `src/vendor/vectors/`
 
-Those files belong to the repositories that *implement* what they pin — crypto
-owns the primitive vectors, the chain owns its own semantics. Editing one here
-would make this package assert a convention nothing implements, which is the
-precise failure the corpora exist to catch.
+Those files are the chain's, and they pin what the chain *implements*. Editing one
+here would make this package assert a convention nothing implements, which is the
+precise failure the corpus exists to catch.
 
-`make vectors-verify` re-reads both sources and runs as part of `verify` and
-`test`. Change them with `make vectors-sync` after the owning repository has
-moved, never by hand.
+`make vectors-verify` re-reads the chain's release and runs as part of `verify`
+and `test`. Change them with `make vectors-sync` after the chain has moved, never
+by hand.
+
+The primitive vectors are not here: they arrive inside `@timeflareio/crypto`, and
+the tests that assert them resolve them from the package.
 
 ## 🚨 No path may be derived from where this package sits
 
@@ -55,19 +59,19 @@ bug waiting for someone to move a directory.
 
 ## Essential Commands
 
-- `make test` — jest, after verifying both vendored corpora
-- `make verify` — lint, type-check, corpora
-- `make build` — fetch WASM if needed, then `tsc`
-- `make wasm-sync` / `vectors-sync` / `proto-sync` — the cross-repository edges
+- `make test` — jest, after verifying the vendored chain corpus
+- `make verify` — lint, type-check, corpus
+- `make build` — `tsc`, plus the chain vectors the package ships
+- `make vectors-sync` / `proto-sync` — the cross-repository edges make still owns
 - `make doctor` — toolchain check
 - `make help` — grouped target list
 
 **No Rust toolchain is needed.** The WASM bundle is a released artefact from
-`timeflareio/crypto`; this package never builds it. If you find yourself adding
-`wasm-pack` to a workflow here, something has gone wrong.
+`timeflareio/crypto`, installed as a dependency; this package never builds it. If
+you find yourself adding `wasm-pack` to a workflow here, something has gone wrong.
 
-npm scripts remain the inner loop. Make owns the cross-repository edges, because
-those are the parts npm cannot express.
+npm scripts remain the inner loop. Make owns the edges npm cannot express —
+generated protobuf code, and a corpus published as a release tarball.
 
 ## Releases
 
