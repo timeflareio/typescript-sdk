@@ -1,6 +1,6 @@
 {
-  "name": "timeflare-sdk",
-  "version": "0.1.0",
+  "name": "@timeflareio/typescript-sdk",
+  "version": "0.0.3",
   "description": "JavaScript SDK for Timeflare client-side operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,7 @@
     "wasm/"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && mkdir -p dist/vendor/vectors && cp src/vendor/vectors/*.json dist/vendor/vectors/",
     "dev": "tsc --watch",
     "test": "jest",
     "e2e": "node examples/secret-lifecycle.js",
@@ -74,7 +74,9 @@
     "./wasm": {
       "types": "./dist/backends/wasm.d.ts",
       "default": "./dist/backends/wasm.js"
-    }
+    },
+    "./vectors/*.json": "./dist/vendor/vectors/*.json",
+    "./package.json": "./package.json"
   },
   "overrides": {
     "brace-expansion": "^5.0.8"

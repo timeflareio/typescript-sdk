@@ -73,13 +73,21 @@ those are the parts npm cannot express.
 
 Two tarballs per tag, because the consumers differ:
 
-- **dist-only, byte-deterministic** — vendored by the mobile client, which
-  commits a lockfile whose integrity hash covers it. `tsc` output is
-  reproducible; `wasm-opt` output is not, which is why WASM is excluded here.
-- **dist + examples + WASM** — for the chain's e2e harness.
+- **dist-only** — the package a consumer resolves as
+  `@timeflareio/typescript-sdk`. It carries package content and nothing else:
+  WASM is a declared dependency rather than bundled here, and examples are not
+  package content. It also carries the chain-semantics vectors under
+  `dist/vendor/vectors/`, exposed as `@timeflareio/typescript-sdk/vectors/*.json`,
+  because the mobile client asserts one of them and has no other source for it.
+- **dist + examples + WASM** — for the chain's e2e harness, which runs the
+  examples.
 
-Registry publication is deliberately deferred. See
-`docs/planning/PENDING_RELEASE_STRATEGY_PLAN.md`.
+**The manifest version must equal the tag.** `release.yml` refuses a release
+where they disagree, so the version is bumped in the commit that gets tagged.
+
+Nothing is published to a registry. Consumers resolve the dist tarball by its
+release-asset URL and npm records its integrity hash in their lockfile — see
+`docs/planning/PENDING_PUBLICATION_FOOTPRINT_PLAN.md`.
 
 ## Specific to this repository
 
