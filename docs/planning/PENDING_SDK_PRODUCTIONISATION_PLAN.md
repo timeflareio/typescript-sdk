@@ -1,49 +1,110 @@
-# TypeScript SDK Productionisation Plan
+# TypeScript SDK Productionisation — Plan
 
-**Status**: Proposed (automated review, July 2026)
-**Priority**: P3 — developer-adoption gateway (P2 if a testnet launches with no usable SDK)
-**Components**: `typescript-sdk/`, `rust/` (WASM build), `make/client-build.mk`
+*Takes this package from "works in this repository's examples" to one a developer
+outside the project can install and use against a public network: the WASM loader
+and its support matrix, the documentation, and the CI that keeps packaging honest.*
 
-## What this plan does
+> **Status: refining** — §4 carries the open questions; not executable until they
+> are ruled and folded into the body.
+> **Priority**: P3 — developer-adoption gateway. P2 if a testnet launches with no
+> usable SDK.
+> **Origin**: automated review, July 2026.
+> **Components**: `package.json` (`exports`, `files`), `src/backends/wasm.ts`,
+> `src/protocol/`, `examples/`, `README.md` (absent), `docs/`,
+> `.github/workflows/ci.yml`.
 
-Takes `timeflare-sdk` from "works in this repo's examples" to a publishable, documented npm package that a developer outside the project can install and use against a public network — packaging, docs, runtime robustness, and release automation.
+## 1. Scope, and what belongs elsewhere
 
-## Why
+This plan covers **packaging correctness, documentation and CI**.
 
-The SDK's functionality is complete (full three-phase creation, hint-based discovery, reconstruction — proven by `make e2e`), but as a *product* it is unshippable today:
+How the package is distributed, named and versioned belongs to
+`PENDING_PUBLICATION_FOOTPRINT_PLAN.md`, which rules that the package is
+`@timeflareio/typescript-sdk`, that consumers resolve it from a published release
+asset rather than a registry, that the WASM arrives as a dependency on
+`@timeflareio/crypto` rather than a directory synced by make, and that the release
+asserts the package's `version` against the tag. This plan assumes that shape and
+does not restate it.
 
-- **Publishing would ship a broken package**: `wasm/` is git-ignored and only populated by an external `make` build; `package.json` has no `prepare`/`prepublishOnly` hook, so `npm publish` from a fresh checkout ships an empty `wasm/` directory. Version is 0.1.0, never published.
-- **No README** in `typescript-sdk/` at all; `package.json`'s homepage points to a non-existent `/client#readme` path. API documentation exists only as JSDoc in source.
-- **Runtime fragility**: the WASM loader branches on `typeof window === 'undefined'` — wrong or broken in web workers, Deno, Bun, edge runtimes, and some bundler configurations. Node loads the `.wasm` via `fs`; browsers via fetch — neither path is exercised by CI in a real browser.
-- **Loose ends**: `examples/secret-lifecycle.js:18` imports a `NETWORK_CONFIGS` symbol that doesn't exist anywhere (silently `undefined`); `client.prepareSecret` validates `threshold <= 0` while the Rust floor is 2 (misleading error at the boundary); examples shell out to `timeflared keys` and assume a local devnet, so there is no example a third-party developer can actually run against a remote network.
-- The since-deleted TODO.md's client-ecosystem section (Python SDK, Go SDK, component libraries) was aspirational noise until the one SDK that exists is publishable.
+The two interlock in one place: the loader. Resolving the WASM through a
+dependency is the footprint plan's phase 3; making that resolution robust across
+runtimes is §3 phase 1 here. Phase 3 there lands first.
 
-## How
+## 2. Why
 
-### Phase 1 — Packaging correctness
+The functionality is complete — full three-phase creation, hint-based discovery,
+reconstruction, all proven by the chain's `make e2e`. What is missing is
+everything between "the code works" and "a stranger can use it":
 
-1. Wire the WASM build into the npm lifecycle: `prepack` runs the wasm-pack build (or verifies artefacts exist and match the Rust source hash), failing loudly otherwise. Decide bundling strategy: inline the WASM as base64 in a JS module (simplest for consumers, ~size cost), or ship `.wasm` + robust multi-runtime loader.
-2. Modernise the loader: feature-detect capabilities rather than environments where possible; explicit documented support matrix (Node ≥ 18, evergreen browsers, bundler notes for Vite/webpack); conditional `exports` map in `package.json` (`import`/`require`/`browser`).
-3. Rename/scope decision: `timeflare-sdk` vs `@timeflare/sdk` — pick before first publish (renames after publication are painful).
-4. Fix the loose ends: remove the phantom `NETWORK_CONFIGS` import (or implement named network presets — devnet/testnet endpoints — which the symbol name suggests was the intent and is genuinely useful); align the threshold validation floor with Rust's (2); fix the homepage URL.
+- **No `README.md`.** API documentation exists only as JSDoc in source, so the
+  entry point for a new consumer is reading the source tree.
+- **The loader branches on the environment, not on capability.**
+  `typeof window === 'undefined'` is wrong or broken in web workers, Deno, Bun,
+  edge runtimes and several bundler configurations. Node loads the `.wasm` via
+  `fs` and browsers via `fetch`, and neither path is exercised in a real browser.
+- **The test suite cannot catch a loader regression.** Jest mocks the WASM and
+  chain layers, which is right for protocol logic and useless for packaging: the
+  failure mode this package is most likely to ship is one no test would see.
+- **No example a third party can run.** The examples require a devnet and take
+  `RECIPIENT_KEYPAIR` from the environment, which is correct for this repository
+  and unusable for someone with only npm and a public endpoint.
 
-### Phase 2 — Documentation
+## 3. Phases
 
-1. `typescript-sdk/README.md`: install, quickstart (create → discover → reconstruct against a public endpoint), the key-management caveats (recipient private key custody), support matrix, link to spec.md for protocol semantics.
-2. Generated API reference (TypeDoc) published with the docs site or as part of releases.
-3. A **standalone example** that runs against a testnet with only npm — no `timeflared` binary, no local keyring (CosmJS mnemonic signer): this is the real adoption test. (Depends on a public network existing — TESTNET_LAUNCH.)
+**Phase 1 — the loader and the package surface.** Feature-detect capabilities
+rather than environments; state a support matrix (Node, evergreen browsers,
+bundler notes for Vite and webpack) and test against it; give `package.json` a
+conditional `exports` map covering `import`, `require` and `browser`. The WASM is
+resolved through the `@timeflareio/crypto` dependency, so this phase begins after
+the footprint plan's phase 3.
 
-### Phase 3 — CI & release automation
+**Phase 2 — documentation.** A `README.md` carrying install, a quickstart that
+runs create → discover → reconstruct against a public endpoint, the key-custody
+caveats for recipient private keys, the support matrix, and a link to the chain's
+`docs/spec.md` for protocol semantics. A generated API reference (TypeDoc)
+published with releases. A standalone example that needs nothing but npm and an
+endpoint — no `timeflared` binary, no local keyring — which is the real adoption
+test, and which depends on a public network existing.
 
-1. Browser-reality test: a headless-browser (playwright) smoke test that loads the WASM and round-trips seal/unseal — the current Jest suite mocks the WASM/chain layers and cannot catch loader regressions.
-2. npm publish job in the release workflow (RELEASE_ENGINEERING), version-synchronised with the repo tag or independently versioned (see open questions); `npm pack` dry-run + install-from-tarball smoke test in CI so packaging can't silently rot.
-3. Keep the SDK's generated protobuf types (`proto:gen`) verified against `proto/` in CI (drift check) — the proto-breaking launch switch will eventually protect consumers, but the SDK should fail fast on drift now.
+**Phase 3 — CI that keeps packaging honest.** A headless-browser smoke test
+(Playwright) that loads the WASM and round-trips seal/unseal, because the Jest
+suite structurally cannot. An install-from-artefact smoke test, so that what
+consumers actually resolve is exercised rather than assumed. A drift check holding
+`src/generated/` against the chain's `proto/` at the pinned tag, so a proto change
+fails here rather than at a consumer.
 
-## Open questions
+## 4. Open questions
 
-1. **Package identity**: npm scope/name, and is the SDK versioned with the chain (one tag, one version — simpler) or independently (semver reflects SDK API, not protocol)?
-2. **WASM delivery**: inline-base64 (zero-config for consumers, +~30% size, no streaming compile) vs. file-based (leaner, but every bundler/runtime combination is a support ticket)? Recommend inline for v0, revisit at size pressure.
-3. **How much chain-query surface should the SDK wrap?** Today it wraps 8 of the 13 query RPCs; full parity (assignments, reveals, meta, pending) is easy and makes the SDK the canonical client — or keep it minimal and point advanced users at generated clients?
-4. **Signer custody guidance**: examples currently normalise reading private keys from JSON files; published docs need a stated position (mnemonic/env for dev, wallet-adapter for browser). Browser wallet integration (Keplr — requires chain registry + suggest-chain config) is probably its own small plan; in scope here or deferred?
-5. **Other-language SDKs** (Python/Go, from the since-deleted TODO.md): explicitly out of scope until this ships? (Recommended.)
-6. **Client compatibility across chain upgrades** (absorbed from the deleted `docs/guides/UNSOLVED.md`, August 2026): what protocol-versioning does the SDK carry (message-format version fields? a chain-version handshake?), what backward-compatibility window is promised, how are breaking changes announced to SDK consumers and guardian operators (a chain-emitted upgrade notice clients can watch?), and what happens to a guardian daemon running an outdated binary across an upgrade height? Interlocks with question 1 (versioning scheme) and RELEASE_ENGINEERING.
+1. **WASM delivery: inline or file?** Inline base64 is zero-configuration for
+   consumers at roughly 30% size cost and no streaming compile; a file is leaner
+   but every bundler and runtime combination becomes a support question. The
+   decision now sits behind a package boundary — `@timeflareio/crypto` produces
+   the artefact — so it may belong to `crypto` rather than here.
+   *Recommendation*: inline for the first consumable release, revisited under size
+   pressure; and if the artefact shape is what decides it, `crypto` owns the call.
+2. **How much of the chain's query surface should this package wrap?** It wraps a
+   subset today — 8 of 13 query RPCs at the last count. Full parity is
+   straightforward and makes this the canonical client; staying minimal keeps the
+   surface small and points advanced users at generated clients.
+   *Recommendation*: parity, because a consumer who has to reach past the SDK for
+   a query will reach past it for everything.
+3. **Signer custody guidance.** Published documentation needs a stated position:
+   mnemonic or environment for development, wallet adapter for the browser.
+   Browser wallet integration needs a chain-registry entry and suggest-chain
+   configuration, which is its own small plan.
+   *Recommendation*: state the position here; defer the wallet integration.
+4. **Client compatibility across chain upgrades.** What protocol versioning this
+   package carries (a message-format version field, a chain-version handshake),
+   what backward-compatibility window is promised, and how a breaking change
+   reaches consumers. This is a protocol question before it is an SDK one, so it
+   needs the chain's ruling first.
+
+## 5. What this plan does not solve
+
+- **Distribution, naming and versioning** — `PENDING_PUBLICATION_FOOTPRINT_PLAN.md`.
+- **Proto distribution.** `src/generated/` stays committed and `proto-sync` stays,
+  per that plan's §8; phase 3's drift check makes the current arrangement safe
+  rather than replacing it.
+- **Other-language SDKs.** Python and Go clients stay out of scope until this one
+  ships; a second SDK before the first is usable would be a new component with no
+  case made.
+- **A public network.** Phase 2's standalone example cannot exist until one does.
