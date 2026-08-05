@@ -18,6 +18,16 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # A TypeScript major is a toolchain migration, not a dependency bump.
+      # @typescript-eslint and ts-jest consume the compiler as a library and cap
+      # their peer ranges below 7, so the install fails outright; and reaching a
+      # resolution the compiler accepts means moving module resolution to
+      # nodenext, which narrows the Node range this package can claim. Those are
+      # decided together, under a plan, not carried by an automated pull request.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
