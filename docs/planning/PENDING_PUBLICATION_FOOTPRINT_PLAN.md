@@ -1,15 +1,14 @@
 # Publication Footprint — Plan
 
-*Reduces what this project publishes, and how consumers pin it. Every edge moves
-to the resolver its language already has, and nothing is published that no
-consumer asserts. This plan lives here because this package sits at the centre of
-the edges it changes — it consumes the WASM bundle and both vector corpora, and
-it is the artefact the mobile client vendors — but the footprint is the sum of all
-five repositories, so all five are touched.*
+*Reduces what this project publishes, and how consumers pin it. Every edge that
+can move goes onto the resolver its language already has, and nothing is published
+that no consumer asserts. This plan lives here because this package sits at the
+centre of the edges it changes — it consumes the WASM bundle and both vector
+corpora, and it is the artefact the mobile client vendors — but the footprint is
+the sum of all five repositories, so all five are touched.*
 
-> **Status: refining** — created 5 August 2026, most questions ruled the same day.
-> §7 carries the one that remains; this plan is not executable until it is ruled
-> and folded into the body.
+> **Status: ready** — created 5 August 2026, every question ruled the same day
+> (§7). Executable.
 > **Priority**: P3 — maintenance burden and drift risk rather than correctness.
 > P2 once a testnet needs an SDK a third party can install without vendoring a
 > tarball by hand.
@@ -17,8 +16,7 @@ five repositories, so all five are touched.*
 > surface across all five repositories, followed by a per-file audit of what the
 > vector corpora actually bind.
 > **Components**: §6, which is the blast-radius checklist. Related plans:
-> `PENDING_SDK_PRODUCTIONISATION_PLAN.md` in this repository, and
-> `PENDING_RELEASE_STRATEGY_PLAN.md` §6 in `timeflareio/chain`.
+> `PENDING_SDK_PRODUCTIONISATION_PLAN.md` in this repository.
 
 ## 1. What this plan does
 
@@ -27,14 +25,16 @@ Three things, in this order of value:
 1. **Stops publishing three vector files that bind nothing across a repository
    boundary.** The audit in §3 shows which files earn distribution and which do
    not.
-2. **Moves each surviving edge onto its language's own resolver** — Go modules for
-   Go consumers, npm for TypeScript consumers, Cargo for the Rust consumer — so
-   that fetching, hash-verifying and recording a pin are done by a toolchain
-   rather than by a Makefile. No package registry is involved: npm resolves a
-   tagged artefact directly, and the lockfile carries its integrity hash.
-3. **Leaves one pin per edge, in the manifest the toolchain already reads**,
-   which closes the one drift risk this survey found with no detection at all
-   (§2, mobile's crypto version in three places).
+2. **Moves the TypeScript and Go artefact edges onto their language's own
+   resolver**, so that fetching, hash-verifying and recording a pin are done by a
+   toolchain rather than by a Makefile. No package registry is involved: npm
+   resolves a published release asset directly, and the lockfile carries its
+   integrity hash.
+3. **Reduces the pins nothing checks from eight to three** (§2), and closes the
+   one drift risk this survey found with no detection at all — mobile's crypto
+   version in three places.
+
+It deliberately leaves the largest single artefact alone; §8 says why.
 
 ## 2. Why
 
@@ -42,17 +42,15 @@ The project moves released artefacts between repositories by hand. Every edge
 reimplements what a package manager does: fetch by version, verify by hash,
 record the pin. Measured on 5 August 2026:
 
-| | Today |
-|---|---|
-| Make targets whose only job is moving artefacts between repositories | **12** — `wasm-sync`, `proto-sync`, `vectors-sync` ×2, `vectors-verify` ×2, `verify-pins`, `sdk-sync` ×2, `sdk-verify`, `guardiand-sync`, `networks-sync` |
-| Share of a Makefile that is this machinery | roughly half of `typescript-sdk` (104 of 201 lines), about a quarter of `guardian` (85 of 334) |
-| Bespoke vendoring shell | 260 lines in `mobile-client/scripts` |
-| Release workflow | 677 lines across the four `release.yml` files |
-| Pin mechanisms | **4** — `go.mod` requires, three `versions.env` files, a bare `CHAIN_VECTORS_VERSION` file, a Cargo git tag |
-| Pinned values | **13** across those mechanisms |
-| Committed upstream artefacts | ~1.0 MB — `typescript-sdk/src/generated` (704K), `mobile-client/vendor/timeflare-sdk.tgz` (236K), `typescript-sdk/src/vendor/vectors` (44K), `guardian/testdata/vectors` (20K) |
+| | Today | After |
+|---|---|---|
+| Make targets whose only job is moving artefacts between repositories | **12** | **7** — five deleted, two reduced to one corpus each |
+| Hand-written pins that no toolchain checks | **8** — `CRYPTO_VERSION`/`CHAIN_VERSION` ×2 in two `versions.env`, `SDK_VERSION` ×2, `GUARDIAN_VERSION`, `CHAIN_VECTORS_VERSION` | **3** — the SDK's `CHAIN_VERSION`, and the devnet's two |
+| `versions.env` files | 3 | 2 — mobile's goes; this repository's reduces to one value |
+| Bespoke vendoring shell | 260 lines in `mobile-client/scripts` | `sdk-sync.sh` (67) goes |
+| Committed upstream artefacts | ~1.0 MB | ~0.75 MB — the vendored tarball (236K) and the guardian's corpus (20K) go |
 
-Two consequences are already visible in the tree:
+Two consequences of the current shape are already visible in the tree:
 
 - **A pin can name an artefact that does not exist.** The chain's
   `devnet/versions.env` pins `GUARDIAN_VERSION=v0.0.4`; the guardian's latest tag
@@ -120,8 +118,8 @@ repository they come from: `@timeflareio/crypto` and
 | crypto crate → mobile | Cargo git tag | `packages/crypto/rust/Cargo.toml` + `Cargo.lock`, and nowhere else |
 | `@timeflareio/crypto` (WASM + travelling primitive vectors) → this package | npm, from the release asset | `package.json` + lockfile |
 | `@timeflareio/typescript-sdk` → mobile | npm, from the release asset | `app/package.json` + lockfile |
-| chain vectors → this package, mobile | §7 Q1 | — |
-| guardian binaries → devnet | compose image tag | the chain's compose file |
+| **chain vectors → TypeScript consumers** | inside `@timeflareio/typescript-sdk` | `app/package.json` + lockfile |
+| guardian binaries → devnet | container image tag for the compose path | the chain's compose definition |
 | SDK examples → devnet e2e | GitHub release asset, unchanged | the chain's devnet configuration |
 
 Both npm edges resolve the tarball its release already publishes — the
@@ -140,10 +138,15 @@ dependency rather than bundled content, and examples are not package content at
 all. The examples bundle therefore stays exactly as it is — the devnet e2e harness
 runs from it, and it is not part of the footprint that hurts.
 
-What that deletes: three `versions.env` files, `CHAIN_VECTORS_VERSION`, ten of
-the twelve sync/verify targets, `mobile-client/scripts/sdk-sync.sh`, the vendored
-tarball, and the CI byte-compare that guards it — because the lockfile's integrity
-hash is the same guarantee, maintained by the tool rather than by a job.
+**The chain-owned vectors that TypeScript asserts travel inside this package.**
+The five files this package and the mobile app read are held here and shipped in
+the released tarball, so the mobile client obtains `client_conventions.json` as an
+ordinary consequence of depending on the SDK and stops fetching from the chain
+altogether. This package keeps one chain pin for refreshing them. That makes this
+package a carrier for data it does not own, which is the accepted cost: the
+alternative is a new published TypeScript artefact from a Go repository, and that
+belongs to the proto-distribution question in §8 rather than to five small JSON
+files.
 
 ## 5. Phases
 
@@ -170,29 +173,33 @@ so it walks the chain's `PROTOCOL_CHANGE.md`.
 **Phase 3 — `@timeflareio/crypto` becomes an npm dependency.** `crypto`'s WASM
 package is renamed to match, and this repository depends on its release asset URL,
 drops `wasm-sync` and its `wasm/` ignore rule, and imports the WASM through the
-dependency in `src/backends/wasm.ts` rather than from a synced directory. Smallest
-blast radius of any resolver change — one consumer — so it is where the mechanics
-get proven, including reading the packed file list before anything depends on it.
+dependency in `src/backends/wasm.ts` rather than from a synced directory. The
+crypto half of `vectors-sync` and `vectors-verify` goes with it, leaving both
+targets covering the chain corpus only. Smallest blast radius of any resolver
+change — one consumer — so it is where the mechanics get proven, including reading
+the packed file list before anything depends on it.
 
 **Phase 4 — `@timeflareio/typescript-sdk` becomes an npm dependency.** The
-package is renamed, and the release workflow asserts that its `version` equals the
-tag being released, failing the release when they disagree. The determinism
-machinery around the dist-only artefact comes out here, along with the reasoning
-recorded for it in the workflow.
+package is renamed; the published file list grows to carry the chain vectors the
+mobile client asserts; and the release workflow asserts that the package's
+`version` equals the tag being released, failing the release when they disagree.
+The determinism machinery around the dist-only artefact comes out here, along with
+the reasoning recorded for it in the workflow.
 
 **Phase 5 — flip the mobile client.** `app/package.json` and `e2e/package.json`
 depend on the tagged artefact; `versions.env`, `vendor/`, `sdk-sync.sh`,
-`sdk-verify` and the CI byte-compare go, with the regenerated lockfile in the
-same change. The crypto version reduces to the Cargo pair.
+`sdk-verify`, the CI byte-compare and the vendored copy of the chain corpus all
+go, with the regenerated lockfile in the same change. The crypto version reduces
+to the Cargo pair, which is the drift this plan set out to close.
 
-**Phase 6 — devnet pins and the record.** The guardian pin becomes the compose
-image tag. A `COMPATIBILITY.md` row is appended only after `make e2e` and
-`make e2e-scenarios` pass against those exact artefacts.
+**Phase 6 — the devnet and the record.** The guardian pin is expressed as the
+container image tag on the compose path. A `COMPATIBILITY.md` row is appended only
+after `make e2e` and `make e2e-scenarios` pass against those exact artefacts.
 
 ## 6. Components
 
 - **`typescript-sdk/`** (this repository) — `package.json`, `versions.env`,
-  `Makefile` (`wasm-sync`, `proto-sync`, `vectors-sync`, `vectors-verify`),
+  `Makefile` (`wasm-sync`, `vectors-sync`, `vectors-verify`),
   `.github/workflows/release.yml`, `src/backends/wasm.ts`, `src/vendor/vectors/`,
   `.gitignore`, `src/protocol/__tests__/`.
 - **`crypto/`** — `vectors/`, `.github/workflows/release.yml`, `rust/`
@@ -213,28 +220,49 @@ image tag. A `COMPATIBILITY.md` row is appended only after `make e2e` and
 - **Cross-cutting** — every `README.md` that documents a sync target, and the
   workspace-level description of which way things point.
 
-## 7. Open questions
+## 7. Decisions — RULED (5 August 2026)
 
-**Q1 — who carries the chain vectors for TypeScript consumers?** Either this
-package ships them as package data, or the chain publishes a package carrying
-protos and vectors together — which would also retire this repository's committed
-`src/generated/` (704K) and its `proto-sync`. The second is a new published
-artefact and belongs to the chain's `PENDING_RELEASE_STRATEGY_PLAN.md` §6.
-*Recommendation*: settle that §6 first; this package carrying them is the smaller
-step and does not foreclose the other.
+1. **npm resolves a published release asset; no registry publication.** The
+   `timeflareio` npm organisation exists, which reserves the scope, but nothing is
+   published to the registry. A git dependency was rejected on evidence: `dist/`
+   and `wasm/` are git-ignored and there is no `prepare` script, so a
+   `github:…#tag` dependency installs a package with no build output, and building
+   on install would need `gh` authentication in the consumer's environment.
+2. **Packages are named `@timeflareio/crypto` and `@timeflareio/typescript-sdk`**,
+   mirroring the organisation and repository names.
+3. **The chain-owned vectors that TypeScript asserts travel inside this package**
+   (§4). The alternative — a TypeScript artefact published by the chain — is a new
+   component whose real prize is the generated protobuf code, so it is argued on
+   that basis in its own plan rather than settled here.
+4. **FFI marshalling coverage is kept as one fixture in the UniFFI wrapper**, not
+   as a versioned corpus.
+5. **The examples bundle is unchanged**, and stays a GitHub release asset.
+6. **If registry publication is ever adopted**, it goes through trusted publishing
+   via GitHub Actions OIDC with provenance attestations, so that no long-lived
+   credential exists to leak. Nothing in this plan requires it.
+7. **The primitive corpus stops being published** without waiting on
+   `CRYPTO_ASSURANCE_PLAN.md`. Publishing for an external reviewer is a different
+   justification from publishing for consumers, and the tagged source satisfies it
+   today.
 
 ## 8. What this plan does not solve
 
+- **Proto distribution, and with it the largest committed artefact.**
+  `proto-sync`, this repository's `CHAIN_VERSION` pin and the 704K of generated
+  code in `src/generated/` are all untouched. Retiring them means the chain
+  publishing a TypeScript artefact, which needs a Node build in a Go repository's
+  release pipeline and a new-component case made under architectural minimalism.
+  That is the single largest remaining reduction and it deserves its own plan.
 - **The guardian's mirrored `replace` block shrinks; it does not go.** The gin
   pin can become a plain `require`, which MVS propagates to consumers. The
   goleveldb pin is a *downgrade*, which MVS cannot express, and
   `nhooyr.io/websocket → coder/websocket` is a module-path rewrite. Both need
   `replace`, so `verify-pins` stays with less to check.
-- **Registry publication.** Nothing here publishes to npm, so npm accounts,
-  tokens and access levels stay out of scope. Should that change — it is a
-  one-line dependency change for consumers — it goes through trusted publishing
-  via GitHub Actions OIDC with provenance attestations, so that no long-lived
-  credential exists to leak.
+- **The devnet's own pins.** `devnet/versions.env` survives: the compose path
+  moves to an image tag, but the binary path and the examples bundle still need a
+  version, and `guardiand-sync` and the devnet's `sdk-sync` stay.
+  `mobile-client`'s `networks-sync` is unrelated to this plan — the fallback
+  network list is pinned to nothing by design.
 - **Binary and image release mechanics.** Whether `goreleaser` replaces the
   hand-written cross-compile matrices is a separate concern with its own
   new-component argument to make.
@@ -244,7 +272,7 @@ step and does not foreclose the other.
   documentation and the runtime support matrix — which is
   `PENDING_SDK_PRODUCTIONISATION_PLAN.md`'s subject. That plan's phase 1 assumes
   the WASM is built here; phase 3 of this plan makes it a dependency instead, so
-  that section needs rewriting in place when this plan is ruled.
+  that section needs rewriting in place before either plan executes.
 - **`COMPATIBILITY.md` remains hand-appended.** The streams stay independent, so
   the matrix is still the only place they are related; its corpus columns narrow
   as vectors move inside modules.
