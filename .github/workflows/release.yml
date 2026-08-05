@@ -5,15 +5,19 @@ name: Release
 # TWO tarballs, because this package has two consumers wanting different things
 # and one artefact cannot serve both:
 #
-#   timeflare-sdk-<tag>.tgz            dist only, npm-pack shaped, DETERMINISTIC
+#   timeflare-sdk-<tag>.tgz              dist only, npm-pack shaped
 #   timeflare-sdk-examples-<tag>.tar.gz  dist + examples + wasm, for the e2e harness
 #
-# The determinism of the first is a hard requirement, not a nicety. The mobile
-# client vendors it and commits a lockfile whose integrity hash covers it, so a
-# tarball that differs byte-for-byte between builds would break that lockfile on
-# every release. tsc output is reproducible and npm normalises tarball mtimes —
-# but wasm-opt output is NOT byte-reproducible, which is exactly why wasm is
-# excluded from that artefact and shipped in the second one instead.
+# The split is a dependency boundary. The first is what a consumer resolves as
+# `@timeflareio/typescript-sdk`, so it carries package content and nothing else:
+# the WASM is a declared dependency on `@timeflareio/crypto` rather than bundled
+# here, and examples are not package content at all. The second exists because
+# the chain's e2e harness runs the examples, which the package has no reason to
+# ship.
+#
+# npm records the integrity hash of whatever it fetched, so the first artefact
+# does not need to be byte-reproducible between builds — it needs to stay
+# unreplaced once published.
 on:
   push:
     tags: ["v*"]
@@ -43,6 +47,20 @@ jobs:
               ;;
           esac
 
+      # A consumer resolves this package by URL and records the tarball's own
+      # identity in its lockfile, so a manifest version that disagrees with the
+      # tag would put two different answers in circulation for one release.
+      - name: Assert the manifest version matches the tag
+        run: |
+          set -euo pipefail
+          declared="$(node -p "require('./package.json').version")"
+          expected="${GITHUB_REF_NAME#v}"
+          echo "package.json: ${declared} · tag: ${expected}"
+          [ "${declared}" = "${expected}" ] || {
+            echo "::error::package.json declares ${declared} but this release is ${expected}. Bump the version in the commit you tag."
+            exit 1; }
+          echo "✅ manifest and tag agree on ${expected}"
+
       - run: npm ci
 
       - name: Fetch the pinned WASM bundle
@@ -65,7 +83,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: make test
 
-      - name: Pack the deterministic dist tarball
+      - name: Pack the dist tarball
         run: |
           set -euo pipefail
           mkdir -p dist-release
@@ -76,7 +94,29 @@ jobs:
           # Restrict the packed fileset to dist/, dropping wasm/ from `files`.
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('${stage}/package.json'));p.files=['dist/'];fs.writeFileSync('${stage}/package.json',JSON.stringify(p,null,2)+'\n')"
           ( cd "${stage}" && npm pack >/dev/null )
-          mv "${stage}"/timeflare-sdk-*.tgz "dist-release/timeflare-sdk-${GITHUB_REF_NAME}.tgz"
+          # npm names the tarball after the package, scope included; the asset name
+          # is what consumers resolve, so it stays as it is.
+          mv "${stage}"/*.tgz "dist-release/timeflare-sdk-${GITHUB_REF_NAME}.tgz"
+
+      # A consumer resolves this asset and reads the chain vectors out of it, so
+      # assert the identity and the payload rather than trusting the pack.
+      - name: Assert the packed identity and payload
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          tar -xzf "dist-release/timeflare-sdk-${GITHUB_REF_NAME}.tgz" -C "$tmp"
+          name="$(node -p "require('$tmp/package/package.json').name")"
+          version="$(node -p "require('$tmp/package/package.json').version")"
+          echo "packaged: ${name}@${version}"
+          [ "${name}" = "@timeflareio/typescript-sdk" ] || {
+            echo "::error::package name is '${name}'"; exit 1; }
+          [ "${version}" = "${GITHUB_REF_NAME#v}" ] || {
+            echo "::error::package version is '${version}'"; exit 1; }
+          for v in client_conventions creation_fee dials share_band tx_gas wallet_derivation; do
+            [ -f "$tmp/package/dist/vendor/vectors/${v}.json" ] || {
+              echo "::error::dist/vendor/vectors/${v}.json is absent from the package"; exit 1; }
+          done
+          echo "✅ ${name}@${version} carries the chain-semantics vectors"
 
       - name: Pack the examples bundle
         run: |
