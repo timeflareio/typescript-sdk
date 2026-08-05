@@ -21,7 +21,6 @@ include versions.env
 # The corpora, split by which repository implements the behaviour each pins.
 # crypto owns the primitives; the chain owns its own semantics. This package
 # asserts some of both because it sits downstream of both.
-CRYPTO_VECTORS := low_order_keys
 CHAIN_VECTORS  := client_conventions creation_fee dials share_band tx_gas wallet_derivation
 VECTORS_DIR    := src/vendor/vectors
 
@@ -46,7 +45,7 @@ verify: vectors-verify ## Read-only checks: types and vendored corpora
 ##@ Build
 
 .PHONY: build
-build: wasm-sync ## Build the distributable (requires the WASM bundle)
+build: ## Build the distributable
 	@npm run build
 
 .PHONY: install
@@ -55,51 +54,18 @@ install: ## Install dependencies from the lockfile
 
 ##@ Cross-repository artefacts
 
-## fetch the WASM bundle from the pinned timeflareio/crypto release
-wasm-sync:
-	@set -e; \
-	if [ -f wasm/timeflare_crypto.js ]; then \
-		echo "📦 WASM already present (make clean-wasm to refetch)"; exit 0; \
-	fi; \
-	echo "📦 Fetching WASM from timeflareio/crypto@$(CRYPTO_VERSION)"; \
-	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	gh release download "$(CRYPTO_VERSION)" --repo timeflareio/crypto \
-		--pattern 'timeflare-crypto-wasm-*.tgz' --dir "$$tmp"; \
-	mkdir -p wasm; \
-	tar -xzf "$$tmp"/timeflare-crypto-wasm-*.tgz -C wasm; \
-	test -f wasm/timeflare_crypto.js || { echo "❌ bundle did not contain timeflare_crypto.js"; exit 1; }; \
-	echo "✅ WASM $(CRYPTO_VERSION) ready"
-
-.PHONY: clean-wasm
-clean-wasm: ## Remove the fetched WASM bundle
-	@rm -rf wasm
 
 ## refresh the vendored vector corpora from their owning repositories
 #
-# Both corpora arrive the same way — release tarball plus per-file SHA-256
-# manifest — so there is one mechanism to understand rather than one per
-# upstream. Each is unpacked into its own directory: the two corpora are disjoint
-# by design (§5.2 of the migration plan), but a shared directory would make this
-# silently depend on that, and a future overlap would resolve to whichever file
-# `find` reached first.
+# The corpus arrives as a release tarball plus a per-file SHA-256 manifest, so a
+# truncated or substituted download fails loudly rather than comparing equal to
+# itself. The primitive vectors need no step here: they arrive inside the
+# @timeflareio/crypto dependency, and the lockfile's integrity hash covers them.
 vectors-sync:
 	@set -e; \
 	mkdir -p $(VECTORS_DIR); \
 	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	mkdir -p "$$tmp/crypto" "$$tmp/chain"; \
-	echo "📐 Primitive vectors from timeflareio/crypto@$(CRYPTO_VERSION)"; \
-	gh release download "$(CRYPTO_VERSION)" --repo timeflareio/crypto \
-		--pattern 'timeflare-crypto-vectors-*.tar.gz' \
-		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp/crypto"; \
-	tar -xzf "$$tmp"/crypto/timeflare-crypto-vectors-*.tar.gz -C "$$tmp/crypto"; \
-	for v in $(CRYPTO_VECTORS); do \
-		src=$$(find "$$tmp/crypto" -name "$$v.json" -print -quit); \
-		[ -n "$$src" ] || { echo "❌ $$v.json absent from the crypto corpus"; exit 1; }; \
-		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/crypto/*.sha256 | awk '{print $$1}'); \
-		got=$$(shasum -a 256 "$$src" | awk '{print $$1}'); \
-		[ "$$want" = "$$got" ] || { echo "❌ $$v.json fails crypto's manifest"; exit 1; }; \
-		cp "$$src" "$(VECTORS_DIR)/$$v.json"; \
-	done; \
+	mkdir -p "$$tmp/chain"; \
 	echo "📐 Chain-semantics vectors from timeflareio/chain@$(CHAIN_VERSION)"; \
 	gh release download "$(CHAIN_VERSION)" --repo timeflareio/chain \
 		--pattern 'timeflare-chain-vectors-*.tar.gz' \
@@ -113,13 +79,13 @@ vectors-sync:
 		[ "$$want" = "$$got" ] || { echo "❌ $$v.json fails the chain's manifest"; exit 1; }; \
 		cp "$$src" "$(VECTORS_DIR)/$$v.json"; \
 	done; \
-	echo "✅ Corpora synced — review the diff, then run 'make test'"
+	echo "✅ Corpus synced — review the diff, then run 'make test'"
 
 ## verify the vendored corpora still match their pinned sources
 vectors-verify:
 	@set -e; \
 	missing=""; \
-	for v in $(CRYPTO_VECTORS) $(CHAIN_VECTORS); do \
+	for v in $(CHAIN_VECTORS); do \
 		[ -f "$(VECTORS_DIR)/$$v.json" ] || missing="$$missing $$v"; \
 	done; \
 	if [ -n "$$missing" ]; then \
@@ -127,23 +93,12 @@ vectors-verify:
 		echo "   Run 'make vectors-sync'."; exit 1; \
 	fi; \
 	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
-	mkdir -p "$$tmp/crypto" "$$tmp/chain"; \
+	mkdir -p "$$tmp/chain"; \
 	fail=0; \
-	gh release download "$(CRYPTO_VERSION)" --repo timeflareio/crypto \
-		--pattern 'timeflare-crypto-vectors-*.sha256' --dir "$$tmp/crypto" >/dev/null 2>&1 || { \
-		echo "❌ could not read crypto@$(CRYPTO_VERSION)'s manifest"; exit 1; }; \
 	gh release download "$(CHAIN_VERSION)" --repo timeflareio/chain \
 		--pattern 'timeflare-chain-vectors-*.sha256' --dir "$$tmp/chain" >/dev/null 2>&1 || { \
 		echo "❌ could not read chain@$(CHAIN_VERSION)'s vectors manifest."; \
 		echo "   Does that tag carry a release? Chain tags before v0.0.2 do not."; exit 1; }; \
-	for v in $(CRYPTO_VECTORS); do \
-		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/crypto/*.sha256 | awk '{print $$1}'); \
-		if [ -z "$$want" ]; then \
-			echo "❌ $$v.json is absent from crypto@$(CRYPTO_VERSION)'s manifest"; fail=1; continue; \
-		fi; \
-		got=$$(shasum -a 256 "$(VECTORS_DIR)/$$v.json" | awk '{print $$1}'); \
-		[ "$$want" = "$$got" ] || { echo "❌ $$v.json differs from crypto@$(CRYPTO_VERSION)"; fail=1; }; \
-	done; \
 	for v in $(CHAIN_VECTORS); do \
 		want=$$(grep -E "[ /]$$v\.json$$" "$$tmp"/chain/*.sha256 | awk '{print $$1}'); \
 		if [ -z "$$want" ]; then \
@@ -158,7 +113,7 @@ vectors-verify:
 		echo "   editing them here would assert conventions nothing implements."; \
 		exit 1; \
 	fi; \
-	echo "✅ Vendored corpora match crypto@$(CRYPTO_VERSION) and chain@$(CHAIN_VERSION)"
+	echo "✅ Vendored corpus matches chain@$(CHAIN_VERSION)"
 
 ## regenerate src/generated/ from the pinned chain's protobuf definitions
 proto-sync:
@@ -198,4 +153,4 @@ help: ## Show this help
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 	@echo ""
 
-.PHONY: wasm-sync vectors-sync vectors-verify proto-sync
+.PHONY: vectors-sync vectors-verify proto-sync

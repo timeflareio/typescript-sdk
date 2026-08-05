@@ -1,5 +1,6 @@
 /**
- * The client half of the hostile-input corpus (testdata/vectors/low_order_keys.json).
+ * The client half of the hostile-input corpus, read from the
+ * `@timeflareio/crypto` package that owns and ships it.
  *
  * The Go suite (crypto/vectors_test.go) and the Rust suite (rust/src/crypto.rs,
  * rust/src/detect.rs) assert the same file. This one covers the layer above
@@ -16,7 +17,7 @@ import * as path from 'path';
 
 import { UnusableGuardianKeyError } from '../crypto';
 
-const CORPUS_FILE = path.join(__dirname, '..', '..', 'vendor', 'vectors', 'low_order_keys.json');
+const CORPUS_FILE = require.resolve('@timeflareio/crypto/vectors/low_order_keys.json');
 
 interface KeyCase {
   name: string;

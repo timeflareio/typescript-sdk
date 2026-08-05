@@ -65,29 +65,36 @@ interface WasmModule {
 }
 
 // A genuine ESM dynamic import that tsc (module: CommonJS) does NOT transform
-// into require() and does NOT statically resolve. This is what lets the SDK's
-// tsc build succeed without the wasm-bindgen artefact present (built
-// separately by `make wasm`) AND load the ESM wasm glue at runtime. Mobile
+// into require() and does NOT statically resolve. That is what lets the tsc
+// build succeed while still loading the ESM wasm glue at runtime. Mobile
 // consumers use the JSI backend and never reach here; only web/Node consumers
-// of `timeflare-sdk/wasm` do.
+// of the `/wasm` entry point do.
 const esmImport = new Function('specifier', 'return import(specifier)') as (
   specifier: string,
 ) => Promise<unknown>;
 
-/** Load and initialise the wasm-bindgen module (Node reads the file; browser fetches). */
+/**
+ * Load and initialise the wasm-bindgen module (Node reads the file; browser
+ * fetches).
+ *
+ * The bundle is the `@timeflareio/crypto` dependency, so both paths name the
+ * package rather than a directory beside this one: Node asks the resolver where
+ * the package landed and reads the `.wasm` sitting next to its entry point, and
+ * the browser leaves resolution to the bundler.
+ */
 async function loadWasm(): Promise<WasmModule> {
   if (typeof window === 'undefined') {
     const fs = await import('fs');
     const path = await import('path');
     const url = await import('url');
-    const jsPath = path.resolve(__dirname, '../../wasm/timeflare_crypto.js');
-    const wasmPath = path.resolve(__dirname, '../../wasm/timeflare_crypto_bg.wasm');
+    const jsPath = require.resolve('@timeflareio/crypto');
+    const wasmPath = path.join(path.dirname(jsPath), 'timeflare_crypto_bg.wasm');
     const mod = (await esmImport(url.pathToFileURL(jsPath).href)) as WasmModule;
     await mod.default(fs.readFileSync(wasmPath));
     return mod;
   }
-  // Browser: the bundler resolves the wasm asset at build time.
-  const mod = (await esmImport('../../wasm/timeflare_crypto')) as WasmModule;
+  // Browser: the bundler resolves the package and its wasm asset at build time.
+  const mod = (await esmImport('@timeflareio/crypto')) as WasmModule;
   await mod.default();
   return mod;
 }
