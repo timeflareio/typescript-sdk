@@ -7,8 +7,10 @@ centre of the edges it changes — it consumes the WASM bundle and both vector
 corpora, and it is the artefact the mobile client vendors — but the footprint is
 the sum of all five repositories, so all five are touched.*
 
-> **Status: ready** — created 5 August 2026, every question ruled the same day
-> (§7). Executable.
+> **Status: in progress** — created and ruled 5 August 2026 (§7). Phase 1 landed
+> in `crypto` (#7, released `v0.0.2`) and `mobile-client` (#13); phase 2's chain
+> half landed (chain #23, released `x/secrets/types/v0.0.3`); phase 4 landed
+> (#7, released `v0.0.3`). Phase 2's guardian half and phases 3, 5 and 6 remain.
 > **Priority**: P3 — maintenance burden and drift risk rather than correctness.
 > P2 once a testnet needs an SDK a third party can install without vendoring a
 > tarball by hand.
