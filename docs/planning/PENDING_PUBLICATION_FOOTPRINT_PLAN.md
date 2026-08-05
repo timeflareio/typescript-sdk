@@ -8,7 +8,7 @@ it is the artefact the mobile client vendors — but the footprint is the sum of
 five repositories, so all five are touched.*
 
 > **Status: refining** — created 5 August 2026, most questions ruled the same day.
-> §7 carries the two that remain; this plan is not executable until they are ruled
+> §7 carries the one that remains; this plan is not executable until it is ruled
 > and folded into the body.
 > **Priority**: P3 — maintenance burden and drift risk rather than correctness.
 > P2 once a testnet needs an SDK a third party can install without vendoring a
@@ -118,15 +118,27 @@ repository they come from: `@timeflareio/crypto` and
 | chain wire contract → guardian | Go proxy | `guardian/go.mod` — unchanged |
 | **chain vectors → guardian** | inside `x/secrets/types` (`testdata/` is files in a module) | `guardian/go.mod` |
 | crypto crate → mobile | Cargo git tag | `packages/crypto/rust/Cargo.toml` + `Cargo.lock`, and nowhere else |
-| `@timeflareio/crypto` (WASM + travelling primitive vectors) → this package | npm, from the tagged artefact (§7 Q2) | `package.json` + lockfile |
-| `@timeflareio/typescript-sdk` → mobile | npm, from the tagged artefact (§7 Q2) | `app/package.json` + lockfile |
+| `@timeflareio/crypto` (WASM + travelling primitive vectors) → this package | npm, from the release asset | `package.json` + lockfile |
+| `@timeflareio/typescript-sdk` → mobile | npm, from the release asset | `app/package.json` + lockfile |
 | chain vectors → this package, mobile | §7 Q1 | — |
 | guardian binaries → devnet | compose image tag | the chain's compose file |
 | SDK examples → devnet e2e | GitHub release asset, unchanged | the chain's devnet configuration |
 
-The examples bundle stays exactly as it is. An npm package should not carry
-examples, the devnet e2e harness runs from that bundle, and it is not part of the
-footprint that hurts.
+Both npm edges resolve the tarball its release already publishes — the
+`https://github.com/…/releases/download/<tag>/<name>-<tag>.tgz` asset — and npm
+records that URL and the artefact's `integrity` hash in the consumer's lockfile.
+Nothing is built on install, and nothing new is committed or published:
+`timeflare-crypto-wasm-<tag>.tgz` and `timeflare-sdk-<tag>.tgz` exist today. Two
+consequences are accepted: the pin is a URL carrying its own version, so these two
+edges have no semver ranges and no automated dependency updates; and the guarantee
+rests on a published release asset not being replaced after the fact, rather than
+on the tarball being byte-reproducible.
+
+That retires byte-reproducibility as a requirement on the dist-only artefact. The
+two-artefact split survives on a different justification: the WASM is a declared
+dependency rather than bundled content, and examples are not package content at
+all. The examples bundle therefore stays exactly as it is — the devnet e2e harness
+runs from it, and it is not part of the footprint that hurts.
 
 What that deletes: three `versions.env` files, `CHAIN_VECTORS_VERSION`, ten of
 the twelve sync/verify targets, `mobile-client/scripts/sdk-sync.sh`, the vendored
@@ -156,16 +168,17 @@ and asserts them from the module it already requires. Needs a wire-contract tag,
 so it walks the chain's `PROTOCOL_CHANGE.md`.
 
 **Phase 3 — `@timeflareio/crypto` becomes an npm dependency.** `crypto`'s WASM
-package is renamed and its release artefact made directly installable; this
-repository depends on it, drops `wasm-sync` and its `wasm/` ignore rule, and
-`src/backends/wasm.ts` imports from the dependency rather than a synced
-directory. Smallest blast radius of any resolver change — one consumer — so it is
-where the mechanics get proven, including reading the packed file list before
-anything depends on it.
+package is renamed to match, and this repository depends on its release asset URL,
+drops `wasm-sync` and its `wasm/` ignore rule, and imports the WASM through the
+dependency in `src/backends/wasm.ts` rather than from a synced directory. Smallest
+blast radius of any resolver change — one consumer — so it is where the mechanics
+get proven, including reading the packed file list before anything depends on it.
 
 **Phase 4 — `@timeflareio/typescript-sdk` becomes an npm dependency.** The
-package is renamed, and the release workflow asserts that its `version` equals
-the tag being released, failing the release when they disagree.
+package is renamed, and the release workflow asserts that its `version` equals the
+tag being released, failing the release when they disagree. The determinism
+machinery around the dist-only artefact comes out here, along with the reasoning
+recorded for it in the workflow.
 
 **Phase 5 — flip the mobile client.** `app/package.json` and `e2e/package.json`
 depend on the tagged artefact; `versions.env`, `vendor/`, `sdk-sync.sh`,
@@ -209,28 +222,6 @@ protos and vectors together — which would also retire this repository's commit
 artefact and belongs to the chain's `PENDING_RELEASE_STRATEGY_PLAN.md` §6.
 *Recommendation*: settle that §6 first; this package carrying them is the smaller
 step and does not foreclose the other.
-
-**Q2 — how does npm resolve a tagged artefact without a registry?** Two forms,
-and they differ in what has to be committed:
-
-- **A git dependency** (`github:timeflareio/typescript-sdk#v0.0.2`) clones the
-  repository at the tag. Both `dist/` and `wasm/` are git-ignored and there is no
-  `prepare` script, so this installs a package with no build output. Making it
-  work means either committing build artefacts, or building on install — and this
-  package's build needs the WASM, which arrives by `gh release download`, so a
-  consumer's `npm install` would need `gh` authentication.
-- **A release-asset dependency** (the `https://…/releases/download/v0.0.2/…tgz`
-  URL) fetches the tarball the release already publishes. npm records `resolved`
-  and `integrity` for it in the lockfile, nothing is built on install, and nothing
-  new is committed or published: `timeflare-crypto-wasm-<tag>.tgz` and
-  `timeflare-sdk-<tag>.tgz` both exist today.
-
-*Recommendation*: the release asset. It reaches the target shape using artefacts
-that already exist, and it keeps build output out of git. Two consequences to
-accept: the pin is a URL carrying the version, so there are no semver ranges and
-no automated dependency updates for these edges; and the guarantee rests on a
-release asset not being replaced after the fact rather than on the tarball being
-byte-reproducible, which retires that requirement on the dist-only artefact.
 
 ## 8. What this plan does not solve
 
