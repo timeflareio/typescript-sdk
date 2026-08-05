@@ -18,16 +18,16 @@ and its support matrix, the documentation, and the CI that keeps packaging hones
 This plan covers **packaging correctness, documentation and CI**.
 
 How the package is distributed, named and versioned belongs to
-`PENDING_PUBLICATION_FOOTPRINT_PLAN.md`, which rules that the package is
+`done/DONE_PUBLICATION_FOOTPRINT_PLAN.md`, which ruled that the package is
 `@timeflareio/typescript-sdk`, that consumers resolve it from a published release
 asset rather than a registry, that the WASM arrives as a dependency on
 `@timeflareio/crypto` rather than a directory synced by make, and that the release
 asserts the package's `version` against the tag. This plan assumes that shape and
 does not restate it.
 
-The two interlock in one place: the loader. Resolving the WASM through a
-dependency is the footprint plan's phase 3; making that resolution robust across
-runtimes is §3 phase 1 here. Phase 3 there lands first.
+The two meet in one place: the loader. The WASM already resolves through the
+`@timeflareio/crypto` dependency; making that resolution robust across runtimes is
+what §3 phase 1 adds.
 
 ## 2. Why
 
@@ -53,9 +53,9 @@ everything between "the code works" and "a stranger can use it":
 **Phase 1 — the loader and the package surface.** Feature-detect capabilities
 rather than environments; state a support matrix (Node, evergreen browsers,
 bundler notes for Vite and webpack) and test against it; give `package.json` a
-conditional `exports` map covering `import`, `require` and `browser`. The WASM is
-resolved through the `@timeflareio/crypto` dependency, so this phase begins after
-the footprint plan's phase 3.
+conditional `exports` map covering `import`, `require` and `browser`. The WASM
+already arrives as the `@timeflareio/crypto` dependency, so what is left here is
+how the loader finds it in each runtime.
 
 **Phase 2 — documentation.** A `README.md` carrying install, a quickstart that
 runs create → discover → reconstruct against a public endpoint, the key-custody
@@ -100,7 +100,7 @@ fails here rather than at a consumer.
 
 ## 5. What this plan does not solve
 
-- **Distribution, naming and versioning** — `PENDING_PUBLICATION_FOOTPRINT_PLAN.md`.
+- **Distribution, naming and versioning** — `done/DONE_PUBLICATION_FOOTPRINT_PLAN.md`.
 - **Proto distribution.** `src/generated/` stays committed and `proto-sync` stays,
   per that plan's §8; phase 3's drift check makes the current arrangement safe
   rather than replacing it.

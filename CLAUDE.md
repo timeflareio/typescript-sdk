@@ -91,7 +91,7 @@ where they disagree, so the version is bumped in the commit that gets tagged.
 
 Nothing is published to a registry. Consumers resolve the dist tarball by its
 release-asset URL and npm records its integrity hash in their lockfile — see
-`docs/planning/PENDING_PUBLICATION_FOOTPRINT_PLAN.md`.
+`docs/planning/done/DONE_PUBLICATION_FOOTPRINT_PLAN.md`.
 
 ## Specific to this repository
 
