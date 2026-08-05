@@ -7,10 +7,13 @@ centre of the edges it changes — it consumes the WASM bundle and both vector
 corpora, and it is the artefact the mobile client vendors — but the footprint is
 the sum of all five repositories, so all five are touched.*
 
-> **Status: in progress** — created and ruled 5 August 2026 (§7). Phase 1 landed
-> in `crypto` (#7, released `v0.0.2`) and `mobile-client` (#13); phase 2's chain
-> half landed (chain #23, released `x/secrets/types/v0.0.3`); phase 4 landed
-> (#7, released `v0.0.3`). Phase 2's guardian half and phases 3, 5 and 6 remain.
+> **Status: done** — created and ruled 5 August 2026, executed the same day.
+> Phase 1: `crypto` #7 (released `v0.0.2`) and `mobile-client` #13. Phase 2:
+> `chain` #23 (released `x/secrets/types/v0.0.3`) and `guardian` #14. Phase 3:
+> `typescript-sdk` #8, with #10 fixing the examples' escape hatch it missed.
+> Phase 4: #7 (`v0.0.4`, `v0.0.5`). Phase 5: `mobile-client` #14. Phase 6:
+> `chain` #24 — all eleven scenarios, 73 assertions, none failed — and the
+> `v0.0.4` compatibility row.
 > **Priority**: P3 — maintenance burden and drift risk rather than correctness.
 > P2 once a testnet needs an SDK a third party can install without vendoring a
 > tarball by hand.
