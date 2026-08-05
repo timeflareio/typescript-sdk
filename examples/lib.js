@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const url = require('url');
 const { execSync } = require('child_process');
 
 const sdk = require('../dist');
@@ -103,9 +104,13 @@ async function connect() {
  * part of the public SDK surface.
  */
 async function loadWasmPrimitives() {
-  // The wasm-bindgen (web target) module is ESM — dynamic import from CJS.
-  const mod = await import('../wasm/timeflare_crypto.js');
-  const wasmPath = path.resolve(__dirname, '../wasm/timeflare_crypto_bg.wasm');
+  // The bundle is the @timeflareio/crypto dependency, so ask the resolver where
+  // it landed rather than looking beside this directory — the examples bundle
+  // carries no wasm/ of its own. The wasm-bindgen (web target) module is ESM,
+  // hence the dynamic import from CJS.
+  const jsPath = require.resolve('@timeflareio/crypto');
+  const wasmPath = path.join(path.dirname(jsPath), 'timeflare_crypto_bg.wasm');
+  const mod = await import(url.pathToFileURL(jsPath).href);
   await mod.default(fs.readFileSync(wasmPath));
   return mod;
 }
