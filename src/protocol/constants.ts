@@ -163,6 +163,22 @@ export const REBATE_COLLECTION_BLOCKS = 1_296_000;
  * this number rather than from a measurement is wrong by an unbounded amount,
  * which is why `BlockClock` reports its widest uncertainty for as long as it
  * is still relying on the seed.
+ *
+ * DELIBERATELY NOT SOURCED FROM THE NETWORK REGISTRY. The chain publishes a
+ * `blockTime` per network in `networks.json`, and the components that need to
+ * know their network read it directly — the guardian fetches the registry, the
+ * mobile client bundles a copy against the same URL. This package does not,
+ * because it has something better: it measures. The seed only covers the moment
+ * before the first measurement lands, it announces itself as unmeasured while it
+ * does, and the seal path refuses to use it at all — sealing turns a chosen date
+ * into a reveal HEIGHT, so an unmeasured clock there commits the secret to the
+ * wrong block rather than mislabelling a date.
+ *
+ * `ANCHOR_TARGET_BLOCKS` (blockclock.ts) also derives from this, to size how far
+ * back the anchor reaches when it measures. That is a sampling distance, not a
+ * timing claim: a baseline of "about a day" averages out jitter at any cadence,
+ * and a seed slower than the real interval makes the window shorter, which is
+ * safer against a pruned node rather than worse.
  */
 export const BLOCK_TIME_ESTIMATE_MS = 6_000;
 
