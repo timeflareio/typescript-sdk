@@ -22,6 +22,7 @@ const {
   CommitSession,
   MemorySessionStore,
   reconstructSecret,
+  revealWindowForStartOffset,
   decryptReconstructed,
   discoverSecrets,
   waitForHeight,
@@ -36,7 +37,7 @@ const PARAMS = {
   minShares: 5,
   maxShares: 5,
   bump: 100,
-  revealWindow: { startOffset: 150, duration: 100 },
+  revealStartOffset: 150,
 };
 
 function watchOpts(blocks, onProgress) {
@@ -85,7 +86,7 @@ async function main() {
   console.log(`✅ Activated: ${pending.acceptedCount} guardians holding bonds`);
 
   // Hold until the reveal window opens
-  await waitForHeight(rest, pending.revealStartBlock, watchOpts(PARAMS.revealWindow.startOffset + 20));
+  await waitForHeight(rest, pending.revealStartBlock, watchOpts(PARAMS.revealStartOffset + 20));
   console.log(`🔓 Reveal window open (blocks ${pending.revealStartBlock}–${pending.revealEndBlock})`);
 
   // Reveal watch
@@ -94,7 +95,7 @@ async function main() {
     secretId,
     PARAMS.threshold,
     pending.revealEndBlock,
-    watchOpts(PARAMS.revealWindow.duration + 20, (note) => console.log(`  reveals: ${note}`)),
+    watchOpts(revealWindowForStartOffset(PARAMS.revealStartOffset) + 20, (note) => console.log(`  reveals: ${note}`)),
   );
   console.log(`🔑 ${reveals.length}/${PARAMS.threshold} shares revealed`);
 

@@ -13,7 +13,7 @@
  * hatch (lib.loadWasmPrimitives) — deliberately NOT part of the SDK's public
  * surface, only the audited low-level functions the seal composes.
  *
- * Usage: node scenario-create.js <manifest-path> [startOffset] [duration] [bump]
+ * Usage: node scenario-create.js <manifest-path> [startOffset] [bump]
  */
 
 const fs = require('fs');
@@ -36,13 +36,12 @@ const THRESHOLD = 3;
 const DEFAULT_SHARES = 5;
 
 async function main() {
-  const [manifestPath, startOffsetArg, durationArg, bumpArg, sharesArg] = process.argv.slice(2);
+  const [manifestPath, startOffsetArg, bumpArg, sharesArg] = process.argv.slice(2);
   if (!manifestPath) {
-    console.error('usage: scenario-create.js <manifest-path> [startOffset] [duration] [bump] [shares]');
+    console.error('usage: scenario-create.js <manifest-path> [startOffset] [bump] [shares]');
     process.exit(1);
   }
   const startOffset = parseInt(startOffsetArg || '150', 10);
-  const duration = parseInt(durationArg || '100', 10);
   const bump = parseInt(bumpArg || '100', 10);
   const [minArg, maxArg] = String(sharesArg || DEFAULT_SHARES).split(':');
   const MAX_SHARES = parseInt(maxArg || minArg, 10);
@@ -61,7 +60,7 @@ async function main() {
       ephemeralPub: toUint8Array(hint.ephemeralPub),
       tag: toUint8Array(hint.tag),
     },
-    revealWindow: { startOffset, duration },
+    revealStartOffset: startOffset,
     threshold: THRESHOLD,
     minShares: MIN_SHARES,
     maxShares: MAX_SHARES,
