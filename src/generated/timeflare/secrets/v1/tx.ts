@@ -8,7 +8,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { Coin } from "../../../cosmos/base/v1beta1/coin";
 import { BoolValue } from "../../../google/protobuf/wrappers";
-import { DetectionHint, RevealWindow } from "./secret";
+import { DetectionHint } from "./secret";
 
 export const protobufPackage = "timeflare.secrets.v1";
 
@@ -26,10 +26,11 @@ export const protobufPackage = "timeflare.secrets.v1";
 export interface MsgUserRequestGuardians {
   creator: string;
   /** Recipient discovery hint (see secret.proto); random bytes = no discovery */
-  detectionHint: DetectionHint | undefined;
-  revealWindow:
-    | RevealWindow
+  detectionHint:
+    | DetectionHint
     | undefined;
+  /** Blocks from the creation height to reveal_start_block; the window length is derived from it */
+  revealStartOffset: number;
   /** Minimum shares needed for reconstruction (2-16) */
   threshold: number;
   /** Security factor in hundredths (100-1000 = 1.00-10.00); scales reward pool and guardian bonds together */
@@ -143,8 +144,10 @@ export interface MsgGuardianConfirmSharesResponse {
 
 /**
  * MsgGuardianRegister defines the MsgGuardianRegister message for new guardian registration only.
- * Registration charges the protocol entry fee (burned) from the guardian's account in
- * addition to any initial float deposit.
+ * Registration charges the protocol entry fee from the guardian's account into
+ * the fee collector, where it rides the next block's 90/10 fee split — 90%
+ * allocated to validator rewards, 10% burned. It is never returned, and is
+ * charged in addition to any initial float deposit.
  */
 export interface MsgGuardianRegister {
   /** Guardian address (also the signer) */
@@ -155,7 +158,7 @@ export interface MsgGuardianRegister {
   availableFrom: number;
   /** Relative blocks from available_from when guardian stops accepting (minimum 100 blocks) */
   availableUntil: number;
-  /** Initial float deposit (may be zero; entry fee charged separately and burned) */
+  /** Initial float deposit (may be zero; the entry fee is charged separately, into the fee split) */
   deposit:
     | Coin
     | undefined;
@@ -238,7 +241,7 @@ export interface MsgSlashGuardianResponse {
 /**
  * MsgGuardianWithdrawStake defines the MsgGuardianWithdrawStake message for guardians to withdraw
  * their unlocked float. Bonds for in-flight secrets remain locked; the guardian
- * record persists (registration is permanent — the entry fee is burned).
+ * record persists (registration is permanent — the entry fee is never returned).
  */
 export interface MsgGuardianWithdrawStake {
   guardian: string;
@@ -312,7 +315,7 @@ function createBaseMsgUserRequestGuardians(): MsgUserRequestGuardians {
   return {
     creator: "",
     detectionHint: undefined,
-    revealWindow: undefined,
+    revealStartOffset: 0,
     threshold: 0,
     bump: 0,
     minShares: 0,
@@ -328,8 +331,8 @@ export const MsgUserRequestGuardians: MessageFns<MsgUserRequestGuardians> = {
     if (message.detectionHint !== undefined) {
       DetectionHint.encode(message.detectionHint, writer.uint32(18).fork()).join();
     }
-    if (message.revealWindow !== undefined) {
-      RevealWindow.encode(message.revealWindow, writer.uint32(26).fork()).join();
+    if (message.revealStartOffset !== 0) {
+      writer.uint32(24).int64(message.revealStartOffset);
     }
     if (message.threshold !== 0) {
       writer.uint32(32).int64(message.threshold);
@@ -370,11 +373,11 @@ export const MsgUserRequestGuardians: MessageFns<MsgUserRequestGuardians> = {
           continue;
         }
         case 3: {
-          if (tag !== 26) {
+          if (tag !== 24) {
             break;
           }
 
-          message.revealWindow = RevealWindow.decode(reader, reader.uint32());
+          message.revealStartOffset = longToNumber(reader.int64());
           continue;
         }
         case 4: {
@@ -426,11 +429,11 @@ export const MsgUserRequestGuardians: MessageFns<MsgUserRequestGuardians> = {
         : isSet(object.detection_hint)
         ? DetectionHint.fromJSON(object.detection_hint)
         : undefined,
-      revealWindow: isSet(object.revealWindow)
-        ? RevealWindow.fromJSON(object.revealWindow)
-        : isSet(object.reveal_window)
-        ? RevealWindow.fromJSON(object.reveal_window)
-        : undefined,
+      revealStartOffset: isSet(object.revealStartOffset)
+        ? globalThis.Number(object.revealStartOffset)
+        : isSet(object.reveal_start_offset)
+        ? globalThis.Number(object.reveal_start_offset)
+        : 0,
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
       bump: isSet(object.bump) ? globalThis.Number(object.bump) : 0,
       minShares: isSet(object.minShares)
@@ -454,8 +457,8 @@ export const MsgUserRequestGuardians: MessageFns<MsgUserRequestGuardians> = {
     if (message.detectionHint !== undefined) {
       obj.detectionHint = DetectionHint.toJSON(message.detectionHint);
     }
-    if (message.revealWindow !== undefined) {
-      obj.revealWindow = RevealWindow.toJSON(message.revealWindow);
+    if (message.revealStartOffset !== 0) {
+      obj.revealStartOffset = Math.round(message.revealStartOffset);
     }
     if (message.threshold !== 0) {
       obj.threshold = Math.round(message.threshold);
@@ -481,9 +484,7 @@ export const MsgUserRequestGuardians: MessageFns<MsgUserRequestGuardians> = {
     message.detectionHint = (object.detectionHint !== undefined && object.detectionHint !== null)
       ? DetectionHint.fromPartial(object.detectionHint)
       : undefined;
-    message.revealWindow = (object.revealWindow !== undefined && object.revealWindow !== null)
-      ? RevealWindow.fromPartial(object.revealWindow)
-      : undefined;
+    message.revealStartOffset = object.revealStartOffset ?? 0;
     message.threshold = object.threshold ?? 0;
     message.bump = object.bump ?? 0;
     message.minShares = object.minShares ?? 0;

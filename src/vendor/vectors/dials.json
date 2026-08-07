@@ -1,154 +1,289 @@
 {
-  "description": "Creator-settable dial bounds on MsgUserRequestGuardians, pinned across implementations. The chain asserts these through ValidateBasic AND the keeper's context-dependent reveal-window check (x/secrets/keeper/dial_vectors_test.go); the TypeScript SDK asserts them through its DIALS descriptor table (dials.test.ts). A client that offers a value the chain rejects, or refuses one the chain accepts, fails its own suite. The commit window is NOT a dial: it is the protocol constant CommitTimeoutBlocks (50), which is why the reveal-offset floor is the constant 100 (commit window + 50-block buffer) rather than a computation. ValidateBasic checks every bound here including that floor; the keeper additionally requires the whole window to sit inside the horizon, which needs the block height and so stays keeper-only. Clients mirror the STRICTER (keeper) rule, because offering a value the handler will reject is the defect.",
+  "description": "Creator-settable dial bounds on MsgUserRequestGuardians, pinned across implementations. The chain asserts these through ValidateBasic AND the keeper's equivalent check (x/secrets/keeper/dial_vectors_test.go); the TypeScript SDK asserts them through its DIALS descriptor table (dials.test.ts). A client that offers a value the chain rejects, or refuses one the chain accepts, fails its own suite. Two timing values are NOT dials: the commit window is the protocol constant CommitTimeoutBlocks (50), which is why the reveal-offset floor is the constant 100 (commit window + 50-block buffer); and the reveal window's length is derived from the offset, pinned separately under reveal_window_derivation. The offset ceiling already carries the longest window the derivation can return, so reveal_end_block lands inside the horizon for every offset that passes and there is no separate horizon check for a client to mirror.",
   "bounds": {
-    "threshold": { "min": 2, "max": 16 },
-    "min_shares": { "min": 2, "max": 32 },
-    "max_shares": { "absolute_max": 32, "gap_rule": "max_shares - min_shares < threshold" },
-    "bump_hundredths": { "min": 100, "max": 1000 },
+    "threshold": {
+      "min": 2,
+      "max": 16
+    },
+    "min_shares": {
+      "min": 2,
+      "max": 32
+    },
+    "max_shares": {
+      "absolute_max": 32,
+      "gap_rule": "max_shares - min_shares < threshold"
+    },
+    "bump_hundredths": {
+      "min": 100,
+      "max": 1000
+    },
     "reveal_start_offset_blocks": {
       "min": 100,
-      "rule": "min = CommitTimeoutBlocks (50) + 50 buffer; a constant, not derived from a creator input",
-      "max": 5256000
+      "max": 5248800,
+      "rule": "min = CommitTimeoutBlocks (50) + 50 buffer. max = MaxRevealHorizon (5256000) - RevealWindowCeiling (7200): the furthest opening whose derived window still closes inside the horizon. Both constants, not derived from a creator input."
     },
-    "reveal_duration_blocks": { "min": 100, "max": 14400 },
     "reveal_horizon_blocks": {
       "max": 5256000,
-      "rule": "start_offset + duration <= 5256000"
+      "rule": "start_offset + derived_window <= 5256000, enforced as start_offset <= 5248800"
     }
+  },
+  "reveal_window_derivation": {
+    "description": "The reveal window is derived from the hold \u2014 the interval over which a secret's guardians are unobserved, from commit_deadline to the window opening. Normative in exactly this integer form: multiplication before division, truncating throughout, integer square root. A float sqrt is not an acceptable substitute; its rounding is not guaranteed identical across architectures and this value fixes a settlement height. Every case below is exact, including both knees.",
+    "constants": {
+      "window_floor": 50,
+      "window_ceiling": 7200,
+      "ramp_start": 600,
+      "ramp_end": 432000,
+      "rise": 7150,
+      "span": 431400
+    },
+    "formula": "hold = reveal_start_offset - CommitTimeoutBlocks; hold <= ramp_start -> window_floor; hold >= ramp_end -> window_ceiling; otherwise window_floor + isqrt((hold - ramp_start) * rise * rise / span)",
+    "cases": [
+      {
+        "hold_blocks": 50,
+        "window_blocks": 50,
+        "reason": "protocol-minimum secret (offset 100): floor"
+      },
+      {
+        "hold_blocks": 599,
+        "window_blocks": 50,
+        "reason": "one block below the ramp: still the floor"
+      },
+      {
+        "hold_blocks": 600,
+        "window_blocks": 50,
+        "reason": "ramp start, exact: the last hold on the floor"
+      },
+      {
+        "hold_blocks": 601,
+        "window_blocks": 60,
+        "reason": "one block into the ramp: leaves the floor"
+      },
+      {
+        "hold_blocks": 3600,
+        "window_blocks": 646,
+        "reason": "interior"
+      },
+      {
+        "hold_blocks": 14400,
+        "window_blocks": 1328,
+        "reason": "interior"
+      },
+      {
+        "hold_blocks": 100800,
+        "window_blocks": 3495,
+        "reason": "interior"
+      },
+      {
+        "hold_blocks": 216000,
+        "window_blocks": 5102,
+        "reason": "interior"
+      },
+      {
+        "hold_blocks": 431999,
+        "window_blocks": 7199,
+        "reason": "one block below the ramp end: one block below the ceiling"
+      },
+      {
+        "hold_blocks": 432000,
+        "window_blocks": 7200,
+        "reason": "ramp end, exact: the argument reduces to rise squared, so isqrt returns rise exactly"
+      },
+      {
+        "hold_blocks": 432001,
+        "window_blocks": 7200,
+        "reason": "one block past the ramp end: clamped"
+      },
+      {
+        "hold_blocks": 5255950,
+        "window_blocks": 7200,
+        "reason": "the longest possible hold, at the offset ceiling: clamped"
+      }
+    ]
   },
   "cases": [
     {
       "name": "minimal legal draft",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
       "valid": true
     },
     {
       "name": "standard tier, thirty days out",
-      "threshold": 3, "min_shares": 5, "max_shares": 7, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 432000, "reveal_duration_blocks": 300,
+      "threshold": 3,
+      "min_shares": 5,
+      "max_shares": 7,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 432000,
       "valid": true
     },
     {
       "name": "band exactly at the gap bound",
-      "threshold": 3, "min_shares": 5, "max_shares": 7, "bump_hundredths": 200,
-      "reveal_start_offset_blocks": 110, "reveal_duration_blocks": 100,
+      "threshold": 3,
+      "min_shares": 5,
+      "max_shares": 7,
+      "bump_hundredths": 200,
+      "reveal_start_offset_blocks": 110,
       "valid": true
     },
     {
       "name": "widest legal band below the ceiling",
-      "threshold": 16, "min_shares": 16, "max_shares": 31, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "threshold": 16,
+      "min_shares": 16,
+      "max_shares": 31,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
       "valid": true
     },
     {
       "name": "band pinned at the 32 ceiling",
-      "threshold": 16, "min_shares": 32, "max_shares": 32, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "threshold": 16,
+      "min_shares": 32,
+      "max_shares": 32,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
       "valid": true
     },
     {
       "name": "maximum bump",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 1000,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 1000,
+      "reveal_start_offset_blocks": 150,
       "valid": true
     },
     {
-      "name": "maximum reveal duration",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 14400,
-      "valid": true
-    },
-    {
-      "name": "window ending exactly on the horizon",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 5255900, "reveal_duration_blocks": 100,
-      "valid": true
+      "name": "offset exactly at the ceiling, window closing on the horizon",
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 5248800,
+      "valid": true,
+      "reason": "offset 5248800 + derived window 7200 = 5256000, exactly the horizon"
     },
     {
       "name": "offset exactly at the reveal-offset floor",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 100, "reveal_duration_blocks": 100,
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 100,
       "valid": true
     },
-
     {
       "name": "threshold below the floor",
-      "threshold": 1, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "threshold < 2"
+      "threshold": 1,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "threshold < 2"
     },
     {
       "name": "threshold above the ceiling",
-      "threshold": 17, "min_shares": 17, "max_shares": 17, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "threshold > 16"
+      "threshold": 17,
+      "min_shares": 17,
+      "max_shares": 17,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "threshold > 16"
     },
     {
       "name": "min_shares below the floor",
-      "threshold": 2, "min_shares": 1, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "min_shares < 2"
+      "threshold": 2,
+      "min_shares": 1,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "min_shares < 2"
     },
     {
       "name": "min_shares below threshold",
-      "threshold": 5, "min_shares": 4, "max_shares": 6, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "min_shares < threshold"
+      "threshold": 5,
+      "min_shares": 4,
+      "max_shares": 6,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "min_shares < threshold"
     },
     {
       "name": "max_shares below min_shares",
-      "threshold": 3, "min_shares": 7, "max_shares": 5, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "max_shares < min_shares"
+      "threshold": 3,
+      "min_shares": 7,
+      "max_shares": 5,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "max_shares < min_shares"
     },
     {
       "name": "max_shares above the absolute ceiling",
-      "threshold": 4, "min_shares": 32, "max_shares": 33, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "max_shares > 32"
+      "threshold": 4,
+      "min_shares": 32,
+      "max_shares": 33,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "max_shares > 32"
     },
     {
       "name": "band width equals threshold, violating the strict gap bound",
-      "threshold": 3, "min_shares": 5, "max_shares": 8, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "max_shares - min_shares >= threshold"
+      "threshold": 3,
+      "min_shares": 5,
+      "max_shares": 8,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "max_shares - min_shares >= threshold"
     },
     {
       "name": "bump below the floor",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 99,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "bump < 100"
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 99,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "bump < 100"
     },
     {
       "name": "bump above the ceiling",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 1001,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "bump > 1000"
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 1001,
+      "reveal_start_offset_blocks": 150,
+      "valid": false,
+      "reason": "bump > 1000"
     },
     {
       "name": "reveal offset one block below the floor",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 99, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "start_offset < 100 (the fixed commit window plus the buffer)"
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 99,
+      "valid": false,
+      "reason": "start_offset < 100 (the fixed commit window plus the buffer)"
     },
     {
-      "name": "reveal duration too short",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 99,
-      "valid": false, "reason": "duration < 100"
-    },
-    {
-      "name": "reveal duration too long",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 150, "reveal_duration_blocks": 14401,
-      "valid": false, "reason": "duration > 14400"
-    },
-    {
-      "name": "window ends one block past the horizon",
-      "threshold": 2, "min_shares": 2, "max_shares": 2, "bump_hundredths": 100,
-      "reveal_start_offset_blocks": 5255901, "reveal_duration_blocks": 100,
-      "valid": false, "reason": "start_offset + duration > 5256000 — rejected by the keeper, not by ValidateBasic"
+      "name": "offset one block above the ceiling",
+      "threshold": 2,
+      "min_shares": 2,
+      "max_shares": 2,
+      "bump_hundredths": 100,
+      "reveal_start_offset_blocks": 5248801,
+      "valid": false,
+      "reason": "one block past the offset ceiling, so the derived window would close past the horizon"
     }
   ]
 }

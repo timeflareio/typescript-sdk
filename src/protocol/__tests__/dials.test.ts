@@ -22,9 +22,8 @@ import {
   DialValues,
   dialErrors,
   MAX_TOTAL_SHARES,
-  REVEAL_DURATION_MAX_BLOCKS,
-  REVEAL_DURATION_MIN_BLOCKS,
   REVEAL_START_OFFSET_BUFFER_BLOCKS,
+  REVEAL_START_OFFSET_MAX_BLOCKS,
   REVEAL_START_OFFSET_MIN_BLOCKS,
   shareBandError,
   SHARES_MIN,
@@ -41,7 +40,6 @@ interface DialCase {
   max_shares: number;
   bump_hundredths: number;
   reveal_start_offset_blocks: number;
-  reveal_duration_blocks: number;
   valid: boolean;
   reason?: string;
 }
@@ -65,7 +63,6 @@ function valuesOf(c: DialCase): DialValues {
     maxShares: c.max_shares,
     bumpHundredths: c.bump_hundredths,
     revealStartOffsetBlocks: c.reveal_start_offset_blocks,
-    revealDurationBlocks: c.reveal_duration_blocks,
   };
 }
 
@@ -94,10 +91,9 @@ describe('dial bounds — shared vector matrix', () => {
       min: BUMP_MIN_HUNDREDTHS,
       max: BUMP_MAX_HUNDREDTHS,
     });
-    expect(corpus.bounds.reveal_start_offset_blocks.min).toBe(REVEAL_START_OFFSET_MIN_BLOCKS);
-    expect(corpus.bounds.reveal_duration_blocks).toMatchObject({
-      min: REVEAL_DURATION_MIN_BLOCKS,
-      max: REVEAL_DURATION_MAX_BLOCKS,
+    expect(corpus.bounds.reveal_start_offset_blocks).toMatchObject({
+      min: REVEAL_START_OFFSET_MIN_BLOCKS,
+      max: REVEAL_START_OFFSET_MAX_BLOCKS,
     });
   });
 });
@@ -109,7 +105,6 @@ describe('dial descriptors', () => {
     maxShares: 7,
     bumpHundredths: 100,
     revealStartOffsetBlocks: 432_000,
-    revealDurationBlocks: 300,
   };
 
   test('every descriptor default lands inside its own range', () => {
@@ -165,10 +160,9 @@ describe('dial descriptors', () => {
       COMMIT_TIMEOUT_BLOCKS + REVEAL_START_OFFSET_BUFFER_BLOCKS,
     );
     expect(DIALS.revealStartOffset.min(base)).toBe(REVEAL_START_OFFSET_MIN_BLOCKS);
-    // Independent of every other dial, which is the simplification.
-    expect(DIALS.revealStartOffset.min({ ...base, revealDurationBlocks: 14_400 })).toBe(
-      REVEAL_START_OFFSET_MIN_BLOCKS,
-    );
+    // Both bounds are constants now: the window's length is derived from this
+    // dial rather than set alongside it, so neither end depends on another dial.
+    expect(DIALS.revealStartOffset.max(base)).toBe(REVEAL_START_OFFSET_MAX_BLOCKS);
   });
 
   test('clampDial never returns an illegal value', () => {
