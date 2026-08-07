@@ -63,14 +63,6 @@ export function assignmentStatusToJSON(object: AssignmentStatus): string {
   }
 }
 
-/** RevealWindow defines the reveal timing configuration for MsgUserRequestGuardians */
-export interface RevealWindow {
-  /** Blocks from current block when reveals can start (relative) */
-  startOffset: number;
-  /** Duration in blocks from start to end */
-  duration: number;
-}
-
 /**
  * DetectionHint is the per-secret recipient discovery hint. It replaces the
  * stored recipient public key: the recipient's long-term key never appears
@@ -368,86 +360,6 @@ export interface TerminalSecretRecord {
    */
   payloadDigest: Uint8Array;
 }
-
-function createBaseRevealWindow(): RevealWindow {
-  return { startOffset: 0, duration: 0 };
-}
-
-export const RevealWindow: MessageFns<RevealWindow> = {
-  encode(message: RevealWindow, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.startOffset !== 0) {
-      writer.uint32(8).int64(message.startOffset);
-    }
-    if (message.duration !== 0) {
-      writer.uint32(16).int64(message.duration);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): RevealWindow {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRevealWindow();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.startOffset = longToNumber(reader.int64());
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.duration = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RevealWindow {
-    return {
-      startOffset: isSet(object.startOffset)
-        ? globalThis.Number(object.startOffset)
-        : isSet(object.start_offset)
-        ? globalThis.Number(object.start_offset)
-        : 0,
-      duration: isSet(object.duration) ? globalThis.Number(object.duration) : 0,
-    };
-  },
-
-  toJSON(message: RevealWindow): unknown {
-    const obj: any = {};
-    if (message.startOffset !== 0) {
-      obj.startOffset = Math.round(message.startOffset);
-    }
-    if (message.duration !== 0) {
-      obj.duration = Math.round(message.duration);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<RevealWindow>, I>>(base?: I): RevealWindow {
-    return RevealWindow.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<RevealWindow>, I>>(object: I): RevealWindow {
-    const message = createBaseRevealWindow();
-    message.startOffset = object.startOffset ?? 0;
-    message.duration = object.duration ?? 0;
-    return message;
-  },
-};
 
 function createBaseDetectionHint(): DetectionHint {
   return { version: 0, ephemeralPub: new Uint8Array(0), tag: new Uint8Array(0) };

@@ -1,6 +1,6 @@
 {
   "name": "@timeflareio/typescript-sdk",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "JavaScript SDK for Timeflare client-side operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

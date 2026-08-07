@@ -333,7 +333,8 @@ export class TimeflareTxClient {
    */
   async requestGuardians(params: {
     detectionHint: { version: number; ephemeralPub: Uint8Array; tag: Uint8Array };
-    revealWindow: { startOffset: number; duration: number };
+    /** Blocks from now until reveals may open. The window's length is derived from it. */
+    revealStartOffset: number;
     threshold: number;
     /** Band floor: minimum acceptances for the secret to activate (threshold ≤ min). */
     minShares: number;
@@ -353,8 +354,7 @@ export class TimeflareTxClient {
       minShares: params.minShares,
       maxShares: params.maxShares,
       bumpHundredths: params.bump,
-      revealStartOffsetBlocks: params.revealWindow.startOffset,
-      revealDurationBlocks: params.revealWindow.duration,
+      revealStartOffsetBlocks: params.revealStartOffset,
     });
     if (violations.length > 0) {
       throw new TxValidationError(
@@ -368,7 +368,7 @@ export class TimeflareTxClient {
       value: MsgUserRequestGuardians.fromPartial({
         creator: this.address,
         detectionHint: params.detectionHint,
-        revealWindow: params.revealWindow,
+        revealStartOffset: params.revealStartOffset,
         threshold: params.threshold,
         minShares: params.minShares,
         maxShares: params.maxShares,

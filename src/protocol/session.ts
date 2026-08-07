@@ -25,7 +25,7 @@ import { TimeflareTxClient } from './txclient';
 
 /** Serialisable session state. Real apps encrypt this at rest. */
 export interface CommitSessionState {
-  version: 1;
+  version: 2;
   creator: string;
   /** Composed (pre-seal) payload, base64 — persisted so a killed session can re-seal. */
   payloadB64: string;
@@ -38,7 +38,8 @@ export interface CommitSessionState {
     /** Band ceiling: candidates selected and shares distributed. */
     maxShares: number;
     bump: number;
-    revealWindow: { startOffset: number; duration: number };
+    /** Blocks from creation until reveals open; the window's length follows from it. */
+    revealStartOffset: number;
   };
   /** Set once Phase 1 lands. */
   secretId?: string;
@@ -171,7 +172,7 @@ export class CommitSession {
       /** Override the default band ceiling (advanced; must satisfy the gap bound). */
       maxShares?: number;
       bump: number;
-      revealWindow: { startOffset: number; duration: number };
+      revealStartOffset: number;
     },
   ): CommitSession {
     const maxShares = input.maxShares ?? defaultMaxShares(input.threshold, input.minShares);
@@ -180,7 +181,7 @@ export class CommitSession {
       throw new Error(`invalid guardian band: ${bandError}`);
     }
     return new CommitSession(deps, {
-      version: 1,
+      version: 2,
       creator: deps.tx.address,
       payloadB64: toBase64(input.payload),
       recipientPublicKeyB64: toBase64(input.recipientPublicKey),
@@ -189,14 +190,14 @@ export class CommitSession {
         minShares: input.minShares,
         maxShares,
         bump: input.bump,
-        revealWindow: input.revealWindow,
+        revealStartOffset: input.revealStartOffset,
       },
     });
   }
 
   /** Rehydrate a persisted session (app relaunch). Reconcile before acting. */
   static resume(deps: CommitSessionDeps, state: CommitSessionState): CommitSession {
-    if (state.version !== 1) {
+    if (state.version !== 2) {
       throw new Error(`unknown session version ${state.version} — update your client`);
     }
     return new CommitSession(deps, state);
@@ -226,7 +227,7 @@ export class CommitSession {
         ephemeralPub: toUint8Array(hint.ephemeralPub),
         tag: toUint8Array(hint.tag),
       },
-      revealWindow: this.state.params.revealWindow,
+      revealStartOffset: this.state.params.revealStartOffset,
       threshold: this.state.params.threshold,
       minShares: this.state.params.minShares,
       maxShares: this.state.params.maxShares,

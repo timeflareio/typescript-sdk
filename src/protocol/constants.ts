@@ -117,10 +117,90 @@ export const REVEAL_START_OFFSET_BUFFER_BLOCKS = 50;
  */
 export const REVEAL_START_OFFSET_MIN_BLOCKS =
   COMMIT_TIMEOUT_BLOCKS + REVEAL_START_OFFSET_BUFFER_BLOCKS;
-export const REVEAL_DURATION_MIN_BLOCKS = 100;
-export const REVEAL_DURATION_MAX_BLOCKS = 14_400;
 /** H — reveal_end_block ≤ created_at + H (≈ 1 year at ~6 s blocks). */
 export const MAX_REVEAL_HORIZON_BLOCKS = 5_256_000;
+
+/**
+ * The reveal window is derived by the protocol, never chosen by the creator.
+ * It is a retry budget, sized by how long the guardian has been unobserved: its
+ * last proof of life is its acceptance at the commit deadline, and nothing
+ * obliges it to transact again before revealing. See the chain's spec.md,
+ * "The Reveal Window".
+ *
+ * These four corners and `revealWindowBlocks` mirror x/secrets/types exactly and
+ * are pinned against it by the shared corpus (dials.json). Quoting a price
+ * before submission is the only reason a client needs them — once a secret
+ * exists, its window is a stored height read from the record.
+ */
+export const REVEAL_WINDOW_FLOOR_BLOCKS = 50;
+export const REVEAL_WINDOW_CEILING_BLOCKS = 7_200;
+export const REVEAL_RAMP_START_BLOCKS = 600;
+export const REVEAL_RAMP_END_BLOCKS = 432_000;
+
+/**
+ * The reveal offset ceiling: H less the longest window the derivation can
+ * return, so the furthest legal opening still closes exactly on the horizon.
+ */
+export const REVEAL_START_OFFSET_MAX_BLOCKS =
+  MAX_REVEAL_HORIZON_BLOCKS - REVEAL_WINDOW_CEILING_BLOCKS;
+
+/** Truncating integer square root — the largest x with x² ≤ n. */
+function isqrt(n: number): number {
+  if (n <= 0) return 0;
+  let x = n;
+  let y = Math.floor((x + 1) / 2);
+  while (y < x) {
+    x = y;
+    y = Math.floor((x + n / x) / 2);
+  }
+  return x;
+}
+
+/**
+ * The hold: the interval over which a secret's guardians are unobserved, from
+ * the commit deadline to the window opening.
+ */
+export function revealHoldBlocks(revealStartOffsetBlocks: number): number {
+  return revealStartOffsetBlocks - COMMIT_TIMEOUT_BLOCKS;
+}
+
+/**
+ * The derived window length for a hold. Concave between the two knees: with
+ * breakage arriving at a roughly constant rate, the probability of a guardian
+ * being broken when the window opens rises fastest early and then saturates.
+ *
+ * Integer throughout, multiplication before division, to match the chain
+ * bit-for-bit — this value fixes a settlement height.
+ */
+export function revealWindowBlocks(holdBlocks: number): number {
+  if (holdBlocks <= REVEAL_RAMP_START_BLOCKS) return REVEAL_WINDOW_FLOOR_BLOCKS;
+  if (holdBlocks >= REVEAL_RAMP_END_BLOCKS) return REVEAL_WINDOW_CEILING_BLOCKS;
+  const rise = REVEAL_WINDOW_CEILING_BLOCKS - REVEAL_WINDOW_FLOOR_BLOCKS;
+  const span = REVEAL_RAMP_END_BLOCKS - REVEAL_RAMP_START_BLOCKS;
+  return (
+    REVEAL_WINDOW_FLOOR_BLOCKS +
+    isqrt(Math.floor(((holdBlocks - REVEAL_RAMP_START_BLOCKS) * rise * rise) / span))
+  );
+}
+
+/** The derived window for a creator's offset — the form callers want. */
+export function revealWindowForStartOffset(revealStartOffsetBlocks: number): number {
+  return revealWindowBlocks(revealHoldBlocks(revealStartOffsetBlocks));
+}
+
+/**
+ * The priced distance for an offset: commit_deadline → settlement, which is
+ * reveal_end_block + 1. Every quote needs this, and assembling it by hand is
+ * how a caller ends up re-deriving the window itself.
+ */
+export function revealDistanceBlocks(revealStartOffsetBlocks: number): number {
+  return (
+    revealStartOffsetBlocks +
+    revealWindowForStartOffset(revealStartOffsetBlocks) +
+    1 -
+    COMMIT_TIMEOUT_BLOCKS
+  );
+}
 /** Payload caps: plaintext input / stored ciphertext (two 60 B layers). */
 export const MAX_PAYLOAD_PLAINTEXT_BYTES = 4_096;
 export const MAX_PAYLOAD_CIPHERTEXT_BYTES = 4_216;
@@ -659,8 +739,7 @@ export type DialId =
   | 'minShares'
   | 'maxShares'
   | 'bump'
-  | 'revealStartOffset'
-  | 'revealDuration';
+  | 'revealStartOffset';
 
 /**
  * The dial values a bound may depend on. Every field is required: a bound that
@@ -673,7 +752,6 @@ export interface DialValues {
   maxShares: number;
   bumpHundredths: number;
   revealStartOffsetBlocks: number;
-  revealDurationBlocks: number;
 }
 
 export interface DialDescriptor {
@@ -750,27 +828,14 @@ export const DIALS: Record<DialId, DialDescriptor> = {
     // The chain requires a buffer between the commit deadline and the window;
     // with the commit window fixed, the floor is a constant.
     min: () => REVEAL_START_OFFSET_MIN_BLOCKS,
-    // reveal_end_block must sit inside the horizon, so the offset's ceiling
-    // depends on how long the window itself runs.
-    max: (v) => MAX_REVEAL_HORIZON_BLOCKS - v.revealDurationBlocks,
+    // reveal_end_block must sit inside the horizon. The window's length is
+    // derived from this dial, and its ceiling is already netted off here, so the
+    // bound is a constant rather than a function of another dial.
+    max: () => REVEAL_START_OFFSET_MAX_BLOCKS,
     step: 1,
     default: () => REVEAL_START_OFFSET_MIN_BLOCKS,
     affects: ['cost'],
-    isPinned: (v) =>
-      REVEAL_START_OFFSET_MIN_BLOCKS >= MAX_REVEAL_HORIZON_BLOCKS - v.revealDurationBlocks,
-  },
-  revealDuration: {
-    id: 'revealDuration',
-    label: 'Open for',
-    min: () => REVEAL_DURATION_MIN_BLOCKS,
-    max: (v) =>
-      Math.min(REVEAL_DURATION_MAX_BLOCKS, MAX_REVEAL_HORIZON_BLOCKS - v.revealStartOffsetBlocks),
-    step: 100,
-    default: () => 300,
-    affects: ['reliability', 'cost'],
-    isPinned: (v) =>
-      REVEAL_DURATION_MIN_BLOCKS >=
-      Math.min(REVEAL_DURATION_MAX_BLOCKS, MAX_REVEAL_HORIZON_BLOCKS - v.revealStartOffsetBlocks),
+    isPinned: () => REVEAL_START_OFFSET_MIN_BLOCKS >= REVEAL_START_OFFSET_MAX_BLOCKS,
   },
 };
 
@@ -814,15 +879,8 @@ export function dialError(id: DialId, values: DialValues): string | null {
         return value < min
           ? `reveal start offset too small: ${value} blocks (minimum ${min} blocks = ` +
               `${COMMIT_TIMEOUT_BLOCKS} commit + ${REVEAL_START_OFFSET_BUFFER_BLOCKS} buffer)`
-          : `reveal window ends too far in the future: maximum ${MAX_REVEAL_HORIZON_BLOCKS} ` +
-              `blocks from now (the guardian availability cap)`;
-      case 'revealDuration':
-        return value < REVEAL_DURATION_MIN_BLOCKS
-          ? `reveal duration too short: ${value} blocks (minimum ${REVEAL_DURATION_MIN_BLOCKS})`
-          : value > REVEAL_DURATION_MAX_BLOCKS
-            ? `reveal duration too long: ${value} blocks (maximum ${REVEAL_DURATION_MAX_BLOCKS})`
-            : `reveal window ends too far in the future: maximum ${MAX_REVEAL_HORIZON_BLOCKS} ` +
-              `blocks from now (the guardian availability cap)`;
+          : `reveal start offset too large: ${value} blocks (maximum ${max}, which is the ` +
+              `~1 year guardian availability cap less the longest reveal window)`;
     }
   }
   return null;
@@ -840,8 +898,6 @@ function dialValue(id: DialId, v: DialValues): number {
       return v.bumpHundredths;
     case 'revealStartOffset':
       return v.revealStartOffsetBlocks;
-    case 'revealDuration':
-      return v.revealDurationBlocks;
   }
 }
 

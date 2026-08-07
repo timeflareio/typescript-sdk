@@ -25,7 +25,7 @@ const HINT = {
 
 const LEGAL_PHASE1 = {
   detectionHint: HINT,
-  revealWindow: { startOffset: 432_000, duration: 300 },
+  revealStartOffset: 432_000,
   threshold: 3,
   minShares: 5,
   maxShares: 7,
@@ -56,13 +56,8 @@ describe('requestGuardians refuses what the chain would reject', () => {
     ['band width equal to the threshold', { threshold: 3, minShares: 5, maxShares: 8 }],
     ['bump below the floor', { bump: 99 }],
     ['bump above the ceiling', { bump: 1001 }],
-    [
-      'reveal offset below the fixed floor',
-      { revealWindow: { startOffset: 99, duration: 100 } },
-    ],
-    ['reveal duration too short', { revealWindow: { startOffset: 432_000, duration: 99 } }],
-    ['reveal duration too long', { revealWindow: { startOffset: 432_000, duration: 14_401 } }],
-    ['window past the horizon', { revealWindow: { startOffset: 5_255_901, duration: 100 } }],
+    ['reveal offset below the fixed floor', { revealStartOffset: 99 }],
+    ['reveal offset past the ceiling', { revealStartOffset: 5_248_801 }],
   ];
 
   test.each(cases)('%s', async (_name, override) => {
@@ -76,7 +71,7 @@ describe('requestGuardians refuses what the chain would reject', () => {
       .requestGuardians({
         ...LEGAL_PHASE1,
         bump: 5,
-        revealWindow: { startOffset: 99, duration: 100 },
+        revealStartOffset: 99,
       })
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TxValidationError);

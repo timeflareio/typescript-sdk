@@ -20,7 +20,7 @@ function fakeRest(secret: Partial<Secret> | null, height = 100): TimeflareRestCl
 
 function sessionState(overrides: Partial<CommitSessionState> = {}): CommitSessionState {
   return {
-    version: 1,
+    version: 2,
     creator: 'tmflr1creator',
     payloadB64: Buffer.from('payload').toString('base64'),
     recipientPublicKeyB64: Buffer.alloc(32).toString('base64'),
@@ -29,7 +29,7 @@ function sessionState(overrides: Partial<CommitSessionState> = {}): CommitSessio
       minShares: 5,
       maxShares: 7,
       bump: 100,
-      revealWindow: { startOffset: 150, duration: 100 },
+      revealStartOffset: 150,
     },
     ...overrides,
   };

@@ -30,7 +30,6 @@ export type {
 export type {
   DetectionHint,
   RevealedShare,
-  RevealWindow,
   // The slim record `secretMeta` returns — the shape every status surface
   // reads, and the one that carries no share bytes.
   Secret,
