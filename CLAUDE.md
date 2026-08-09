@@ -45,17 +45,11 @@ the tests that assert them resolve them from the package.
 
 ## 🚨 No path may be derived from where this package sits
 
-`examples/lib.js` used to default the devnet keypair to
-`<sdk>/../../.devnet/recipient-keypair.json`. That worked only because the SDK
-sat inside the same tree as the devnet; it now resolves to something unrelated.
-
-It requires `RECIPIENT_KEYPAIR` and fails loudly if unset. That is deliberate:
-the examples cannot know where a devnet is, and reading whatever happens to
-exist at a guessed path is worse than stopping. The chain's `make e2e` sets it.
-
-When adding an example or test that needs an external file, take the path from
-the environment or an argument. A relative path that escapes this package is a
-bug waiting for someone to move a directory.
+When adding a test or tool that needs an external file, take the path from the
+environment or an argument, and fail loudly when it is unset — reading whatever
+happens to exist at a guessed path is worse than stopping. A relative path that
+escapes this package is a bug waiting for someone to move a directory: it can
+only ever have worked because of where a checkout happened to sit.
 
 ## Essential Commands
 
@@ -75,16 +69,13 @@ generated protobuf code, and a corpus published as a release tarball.
 
 ## Releases
 
-Two tarballs per tag, because the consumers differ:
-
-- **dist-only** — the package a consumer resolves as
-  `@timeflareio/typescript-sdk`. It carries package content and nothing else:
-  WASM is a declared dependency rather than bundled here, and examples are not
-  package content. It also carries the chain-semantics vectors under
-  `dist/vendor/vectors/`, exposed as `@timeflareio/typescript-sdk/vectors/*.json`,
-  because the mobile client asserts one of them and has no other source for it.
-- **dist + examples + WASM** — for the chain's e2e harness, which runs the
-  examples.
+One tarball per tag — **dist-only**, the package every consumer resolves as
+`@timeflareio/typescript-sdk` (the mobile client and the chain's e2e driver
+alike). It carries package content and nothing else: WASM is a declared
+dependency rather than bundled here. It also carries the chain-semantics
+vectors under `dist/vendor/vectors/`, exposed as
+`@timeflareio/typescript-sdk/vectors/*.json`, because the mobile client asserts
+one of them and has no other source for it.
 
 **The manifest version must equal the tag.** `release.yml` refuses a release
 where they disagree, so the version is bumped in the commit that gets tagged.
