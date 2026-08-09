@@ -109,8 +109,11 @@ payload:  0x01 ‖ private_key (32B)  (33 bytes)
   IDs, so the **key** is the durable anchor — after import, discovery
   scanning finds whichever cycle is live. A missing/stale `id` degrades
   gracefully to discovery.
-- Parsers MUST treat the payload as key material: no logging, no clipboard
-  echo, wipe intermediate buffers best-effort.
+- Parsers MUST treat the **decoded** payload as key material: no logging, and
+  wipe intermediate buffers best-effort. The decoded private key MUST NOT be
+  placed on the clipboard in any form. The claim URI itself MAY be copied or
+  shared on explicit user action; a client offering that MUST also offer the
+  user a clipboard clear once the hand-over completes.
 
 ### 4.1 Funded kits — the `seed` parameter
 
