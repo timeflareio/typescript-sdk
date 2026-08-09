@@ -395,7 +395,7 @@ describe('refreshBlockClock', () => {
     };
     void store;
     const a = await refreshBlockClock(devnet, scoped, 'http://10.0.2.2:1317');
-    const b = await refreshBlockClock(mainnet, scoped, 'https://rest.timeflare.io');
+    const b = await refreshBlockClock(mainnet, scoped, 'https://rest.main.timeflare.io');
     expect(a.intervalMs).toBeCloseTo(1_000, 6);
     expect(b.intervalMs).toBeCloseTo(HUB_INTERVAL, 6);
   });
