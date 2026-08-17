@@ -18,22 +18,22 @@
     "proto:gen": "echo 'Use: make proto-sync (fetches the pinned chain protos)' && exit 1"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.13.0",
+    "@bufbuild/protobuf": "^2.14.0",
     "@cosmjs/crypto": "^0.39.0",
     "@cosmjs/encoding": "^0.39.0",
     "@cosmjs/proto-signing": "^0.39.0",
     "@cosmjs/stargate": "^0.39.0",
-    "@noble/hashes": "^2.2.0",
+    "@noble/hashes": "^2.3.0",
     "@timeflareio/crypto": "https://github.com/timeflareio/crypto/releases/download/v0.0.2/timeflare-crypto-wasm-v0.0.2.tgz",
     "bech32": "^2.0.0"
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.15.12",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.2",
-    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@types/node": "^26.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typescript-eslint/parser": "^8.64.0",
-    "eslint": "^10.8.0",
+    "eslint": "^10.8.1",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "ts-proto": "^2.12.0",
