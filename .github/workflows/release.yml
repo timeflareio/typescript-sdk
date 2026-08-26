@@ -2,22 +2,15 @@ name: Release
 
 # Releases are deliberate: pushing a vX.Y.Z tag is the only trigger.
 #
-# TWO tarballs, because this package has two consumers wanting different things
-# and one artefact cannot serve both:
+# ONE tarball: timeflare-sdk-<tag>.tgz, dist only, npm-pack shaped. It is what
+# every consumer resolves as `@timeflareio/typescript-sdk` — the mobile client
+# and the chain's e2e driver alike — so it carries package content and nothing
+# else: the WASM is a declared dependency on `@timeflareio/crypto` rather than
+# bundled here.
 #
-#   timeflare-sdk-<tag>.tgz              dist only, npm-pack shaped
-#   timeflare-sdk-examples-<tag>.tar.gz  dist + examples + wasm, for the e2e harness
-#
-# The split is a dependency boundary. The first is what a consumer resolves as
-# `@timeflareio/typescript-sdk`, so it carries package content and nothing else:
-# the WASM is a declared dependency on `@timeflareio/crypto` rather than bundled
-# here, and examples are not package content at all. The second exists because
-# the chain's e2e harness runs the examples, which the package has no reason to
-# ship.
-#
-# npm records the integrity hash of whatever it fetched, so the first artefact
-# does not need to be byte-reproducible between builds — it needs to stay
-# unreplaced once published.
+# npm records the integrity hash of whatever it fetched, so the artefact does
+# not need to be byte-reproducible between builds — it needs to stay unreplaced
+# once published.
 on:
   push:
     tags: ["v*"]
@@ -106,14 +99,9 @@ jobs:
           done
           echo "✅ ${name}@${version} carries the chain-semantics vectors"
 
-      - name: Pack the examples bundle
+      - name: Checksum the artefacts
         run: |
           set -euo pipefail
-          stage="$(mktemp -d)/timeflare-sdk"
-          mkdir -p "${stage}"
-          cp -R dist examples package.json "${stage}/"
-          tar -czf "dist-release/timeflare-sdk-examples-${GITHUB_REF_NAME}.tar.gz" \
-            -C "$(dirname "${stage}")" timeflare-sdk
           ( cd dist-release && sha256sum ./* > "timeflare-sdk-${GITHUB_REF_NAME}-checksums.txt" )
           ls -la dist-release/
 
@@ -127,12 +115,11 @@ jobs:
             echo
             echo "| Artefact | For |"
             echo "|---|---|"
-            echo "| \`timeflare-sdk-${GITHUB_REF_NAME}.tgz\` | consumers vendoring the package — dist only, byte-deterministic so a committed lockfile's integrity hash stays valid |"
-            echo "| \`timeflare-sdk-examples-${GITHUB_REF_NAME}.tar.gz\` | the chain's e2e harness — dist + examples + WASM |"
+            echo "| \`timeflare-sdk-${GITHUB_REF_NAME}.tgz\` | every consumer vendoring the package — dist only, byte-deterministic so a committed lockfile's integrity hash stays valid |"
             echo
-            echo "Two tarballs because the consumers want different things: the mobile"
-            echo "client needs a reproducible artefact, and \`wasm-opt\` output is not"
-            echo "byte-reproducible, so WASM ships only in the second."
+            echo "WASM is not bundled: it arrives as the declared"
+            echo "\`@timeflareio/crypto\` dependency, resolved and integrity-checked"
+            echo "by the consumer's own lockfile."
             echo
             echo "Not published to a registry — deliberately deferred."
             echo

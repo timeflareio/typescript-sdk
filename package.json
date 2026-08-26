@@ -1,6 +1,6 @@
 {
   "name": "@timeflareio/typescript-sdk",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "JavaScript SDK for Timeflare client-side operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,6 @@
     "build": "rm -rf dist && tsc && mkdir -p dist/vendor/vectors && cp src/vendor/vectors/*.json dist/vendor/vectors/",
     "dev": "tsc --watch",
     "test": "jest",
-    "e2e": "node examples/secret-lifecycle.js",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist wasm node_modules",
     "proto:gen": "echo 'Use: make proto-sync (fetches the pinned chain protos)' && exit 1"
