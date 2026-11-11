@@ -1,5 +1,5 @@
 {
-  "_description": "Client-conventions corpus (docs/guides/CLIENT_CONVENTIONS.md): recipient URI (\u00a73), claim URI (\u00a74), identity-key backup mnemonic (\u00a75), fund URI (\u00a78). Append-only, like every corpus in this directory: new vectors may be added, existing vectors are never edited or removed. Every client implementation asserts all sections in CI. The mnemonic section is anchored to the published BIP39 reference test vectors (32-byte entropy rows).",
+  "_description": "Client-conventions corpus (docs/guides/CLIENT_CONVENTIONS.md): recipient URI (\u00a73), claim URI (\u00a74), identity-key backup mnemonic (\u00a75), fund URI (\u00a78), universal link (\u00a710). Append-only, like every corpus in this directory: new vectors may be added, existing vectors are never edited or removed. Every client implementation asserts all sections in CI. The mnemonic section is anchored to the published BIP39 reference test vectors (32-byte entropy rows).",
   "version": 1,
   "recipient_uri": [
     {
@@ -238,6 +238,200 @@
       "name": "empty address rejected",
       "input": "timeflare:fund/",
       "reason": "not a valid account address"
+    }
+  ],
+  "universal_link": [
+    {
+      "name": "recipient key",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "kind": "key",
+      "url": "https://link.timeflare.io/key#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj"
+    },
+    {
+      "name": "claim kit with secret id",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:claim/tfsk1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7dts88r?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d",
+      "kind": "claim",
+      "url": "https://link.timeflare.io/claim#timeflare:claim/tfsk1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7dts88r?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d"
+    },
+    {
+      "name": "claim kit without secret id",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:claim/tfsk1q8q0lmsqzy3rx3z4vemc3xgq42aueh0wluqpzg3ng32kvaugnx4tk23z8p8",
+      "kind": "claim",
+      "url": "https://link.timeflare.io/claim#timeflare:claim/tfsk1q8q0lmsqzy3rx3z4vemc3xgq42aueh0wluqpzg3ng32kvaugnx4tk23z8p8"
+    },
+    {
+      "name": "funded claim kit: the query of the wrapped URI rides inside the fragment",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:claim/tfsk1qgqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p72rx0zn?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d&seed=tfck1qxsm9s75uhmqwxpf8f94cmt737g2rvkr6njlvpcc9yaykhrd068eqynncxp",
+      "kind": "claim",
+      "url": "https://link.timeflare.io/claim#timeflare:claim/tfsk1qgqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p72rx0zn?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d&seed=tfck1qxsm9s75uhmqwxpf8f94cmt737g2rvkr6njlvpcc9yaykhrd068eqynncxp"
+    },
+    {
+      "name": "fund request, address only",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:fund/tmflr1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnyf6e3x",
+      "kind": "fund",
+      "url": "https://link.timeflare.io/fund#timeflare:fund/tmflr1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnyf6e3x"
+    },
+    {
+      "name": "fund request with amount",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:fund/tmflr1gpq5ys6yg4rywjzfff95cn2wfag9z5jn90kqn4?amount=100000",
+      "kind": "fund",
+      "url": "https://link.timeflare.io/fund#timeflare:fund/tmflr1gpq5ys6yg4rywjzfff95cn2wfag9z5jn90kqn4?amount=100000"
+    },
+    {
+      "name": "another link host: the codec is host-agnostic",
+      "base_url": "https://links.example.org",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "kind": "key",
+      "url": "https://links.example.org/key#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj"
+    }
+  ],
+  "universal_link_parse_only": [
+    {
+      "name": "kind path disagreeing with the fragment: the path is install-page copy, the fragment is the payload",
+      "input": "https://link.timeflare.io/key#timeflare:claim/tfsk1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7dts88r?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d",
+      "host": "link.timeflare.io",
+      "kind": "key",
+      "uri": "timeflare:claim/tfsk1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7dts88r?id=9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d"
+    },
+    {
+      "name": "uppercase scheme and host accepted, host normalised to lowercase",
+      "input": "HTTPS://LINK.TIMEFLARE.IO/key#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "host": "link.timeflare.io",
+      "kind": "key",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj"
+    },
+    {
+      "name": "a query on the link is ignored and never read as payload",
+      "input": "https://link.timeflare.io/key?uri=timeflare:fund/tmflr1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnyf6e3x#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "host": "link.timeflare.io",
+      "kind": "key",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj"
+    },
+    {
+      "name": "surrounding whitespace trimmed",
+      "input": "  https://link.timeflare.io/fund#timeflare:fund/tmflr1gpq5ys6yg4rywjzfff95cn2wfag9z5jn90kqn4?amount=100000\n",
+      "host": "link.timeflare.io",
+      "kind": "fund",
+      "uri": "timeflare:fund/tmflr1gpq5ys6yg4rywjzfff95cn2wfag9z5jn90kqn4?amount=100000"
+    },
+    {
+      "name": "fragment returned verbatim, not validated: the URI parsers decide what a payload means",
+      "input": "https://link.timeflare.io/key#timeflare:recipient/not-a-key",
+      "host": "link.timeflare.io",
+      "kind": "key",
+      "uri": "timeflare:recipient/not-a-key"
+    }
+  ],
+  "universal_link_encode_invalid": [
+    {
+      "name": "http link base rejected",
+      "base_url": "http://link.timeflare.io",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the link base must be https"
+    },
+    {
+      "name": "link base with a path rejected",
+      "base_url": "https://link.timeflare.io/app",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the link base is a scheme and host only"
+    },
+    {
+      "name": "link base with a trailing slash rejected",
+      "base_url": "https://link.timeflare.io/",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the link base is a scheme and host only"
+    },
+    {
+      "name": "bare recipient payload rejected",
+      "base_url": "https://link.timeflare.io",
+      "uri": "tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "only a full timeflare: URI is wrapped"
+    },
+    {
+      "name": "bare account address rejected",
+      "base_url": "https://link.timeflare.io",
+      "uri": "tmflr1qqqsyqcyq5rqwzqfpg9scrgwpugpzysnyf6e3x",
+      "reason": "only a full timeflare: URI is wrapped"
+    },
+    {
+      "name": "unknown timeflare: path rejected",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:secret/9f1b2c3d-4e5f-4a1b-8c2d-3e4f5a6b7c8d",
+      "reason": "only the recipient, claim and fund URIs have a link form"
+    },
+    {
+      "name": "malformed recipient URI rejected",
+      "base_url": "https://link.timeflare.io",
+      "uri": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7dggmps",
+      "reason": "a wrapped URI must itself be valid"
+    }
+  ],
+  "universal_link_invalid": [
+    {
+      "name": "no fragment rejected",
+      "input": "https://link.timeflare.io/key",
+      "reason": "the payload rides in the fragment and nowhere else"
+    },
+    {
+      "name": "empty fragment rejected",
+      "input": "https://link.timeflare.io/claim#",
+      "reason": "the payload rides in the fragment and nowhere else"
+    },
+    {
+      "name": "payload in the path rejected",
+      "input": "https://link.timeflare.io/key/timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the path is exactly one kind"
+    },
+    {
+      "name": "payload in the query rejected",
+      "input": "https://link.timeflare.io/key?uri=timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the payload rides in the fragment and nowhere else"
+    },
+    {
+      "name": "fragment that is not a timeflare: URI rejected",
+      "input": "https://link.timeflare.io/key#https://example.org/",
+      "reason": "the fragment must be a timeflare: URI"
+    },
+    {
+      "name": "bare payload in the fragment rejected",
+      "input": "https://link.timeflare.io/key#tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the fragment must be a timeflare: URI"
+    },
+    {
+      "name": "unknown kind path rejected",
+      "input": "https://link.timeflare.io/secret#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the path is exactly one kind"
+    },
+    {
+      "name": "root path rejected",
+      "input": "https://link.timeflare.io/#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the path is exactly one kind"
+    },
+    {
+      "name": "trailing slash on the kind path rejected",
+      "input": "https://link.timeflare.io/key/#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the path is exactly one kind"
+    },
+    {
+      "name": "http rejected",
+      "input": "http://link.timeflare.io/key#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "universal links are https"
+    },
+    {
+      "name": "credentials in the authority rejected",
+      "input": "https://link.timeflare.io@example.org/key#timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "the authority is a host and nothing else"
+    },
+    {
+      "name": "the custom-scheme URI itself is not a universal link",
+      "input": "timeflare:recipient/tfid1qyqqzqsrqszsvpcgpy9qkrqdpc83qygjzv2p29shrqv35xcur50p7c5chyj",
+      "reason": "universal links are https"
     }
   ]
 }
