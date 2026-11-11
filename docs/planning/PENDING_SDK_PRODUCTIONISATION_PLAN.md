@@ -1,17 +1,31 @@
 # TypeScript SDK Productionisation — Plan
 
-*Takes this package from "works in this repository's examples" to one a developer
+| | |
+|---|---|
+| **Priority** | P3 |
+| **Status** | refining |
+| **Created** | July 2026 |
+| **Updated** | 11 November 2026 |
+| **Protocol surface** | none |
+| **Repositories** | typescript-sdk |
+| **Depends on** | `timeflareio/network` — `PENDING_TESTNET_LAUNCH_PLAN.md` (a public network, for phase 2's quickstart and standalone example); a ruling from `timeflareio/chain` on client compatibility across upgrades (§4 Q4) |
+| **Related** | [DONE_PUBLICATION_FOOTPRINT_PLAN.md](done/DONE_PUBLICATION_FOOTPRINT_PLAN.md) |
+| **Open questions** | 4 (§4) |
+
+*Takes this package from "works under the chain's e2e driver" to one a developer
 outside the project can install and use against a public network: the WASM loader
 and its support matrix, the documentation, and the CI that keeps packaging honest.*
 
-> **Status: refining** — §4 carries the open questions; not executable until they
-> are ruled and folded into the body.
-> **Priority**: P3 — developer-adoption gateway. P2 if a testnet launches with no
-> usable SDK.
-> **Origin**: automated review, July 2026.
-> **Components**: `package.json` (`exports`, `files`), `src/backends/wasm.ts`,
-> `src/protocol/`, `examples/`, `README.md` (absent), `docs/`,
-> `.github/workflows/ci.yml`.
+**Status notes**: §4 carries the open questions. Phase 1 waits only on
+question 1 and phase 3 on nothing outside this repository; phase 2's
+`README.md` and API reference can be written now, while its quickstart and
+standalone example wait on a public network.
+**Why this priority**: developer-adoption gateway. P2 if a testnet launches with no
+usable SDK.
+**Origin**: automated review, July 2026.
+**Components**: `package.json` (`exports`, `files`), `src/backends/wasm.ts`,
+`src/protocol/`, a standalone example (new), `README.md` (new), `docs/`,
+`.github/workflows/ci.yml`.
 
 ## 1. Scope, and what belongs elsewhere
 
@@ -44,16 +58,23 @@ everything between "the code works" and "a stranger can use it":
 - **The test suite cannot catch a loader regression.** Jest mocks the WASM and
   chain layers, which is right for protocol logic and useless for packaging: the
   failure mode this package is most likely to ship is one no test would see.
-- **No example a third party can run.** The examples require a devnet and take
-  `RECIPIENT_KEYPAIR` from the environment, which is correct for this repository
-  and unusable for someone with only npm and a public endpoint.
+- **No example a third party can run.** This repository ships none. The
+  scripts that exercise the package are the chain's e2e driver
+  (`timeflareio/chain` — `devnet/e2e/`), which resolves the released dist
+  tarball and needs a devnet — correct for that harness and unusable for
+  someone with only npm and a public endpoint.
+- **The package surface is half-stated.** `exports` maps `.`, `./wasm`,
+  `./vectors/*.json` and `./package.json` with `types` and `default` only —
+  no `import`, `require` or `browser` conditions. `files` still lists
+  `wasm/`, a directory the dist-only release does not contain.
 
 ## 3. Phases
 
 **Phase 1 — the loader and the package surface.** Feature-detect capabilities
 rather than environments; state a support matrix (Node, evergreen browsers,
-bundler notes for Vite and webpack) and test against it; give `package.json` a
-conditional `exports` map covering `import`, `require` and `browser`. The WASM
+bundler notes for Vite and webpack) and test against it; add the `import`,
+`require` and `browser` conditions to the `exports` map `package.json`
+already has; drop the `wasm/` entry from `files`. The WASM
 already arrives as the `@timeflareio/crypto` dependency, so what is left here is
 how the loader finds it in each runtime.
 
@@ -68,7 +89,9 @@ test, and which depends on a public network existing.
 **Phase 3 — CI that keeps packaging honest.** A headless-browser smoke test
 (Playwright) that loads the WASM and round-trips seal/unseal, because the Jest
 suite structurally cannot. An install-from-artefact smoke test, so that what
-consumers actually resolve is exercised rather than assumed. A drift check holding
+consumers actually resolve is exercised rather than assumed — today that
+happens only downstream, when the chain's e2e driver and the mobile client
+install the released tarball. A drift check holding
 `src/generated/` against the chain's `proto/` at the pinned tag, so a proto change
 fails here rather than at a consumer.
 
@@ -82,7 +105,12 @@ fails here rather than at a consumer.
    *Recommendation*: inline for the first consumable release, revisited under size
    pressure; and if the artefact shape is what decides it, `crypto` owns the call.
 2. **How much of the chain's query surface should this package wrap?** It wraps a
-   subset today — 8 of 13 query RPCs at the last count. Full parity is
+   subset today — 8 of the 14 query RPCs in the chain's
+   `proto/timeflare/secrets/v1/query.proto` (`src/protocol/rest.ts`:
+   `SecretMeta`, `SecretAssignments`, `SecretReveals`, `SecretPayload`,
+   `HintsSince`, `SecretsByCreator`, `SecretTombstone`, `Guardian`; not
+   `Secret`, `Secrets`, `PendingSecrets`, `SecretShare`, `Guardians`,
+   `GuardianKeyHistory`). Full parity is
    straightforward and makes this the canonical client; staying minimal keeps the
    surface small and points advanced users at generated clients.
    *Recommendation*: parity, because a consumer who has to reach past the SDK for
@@ -96,7 +124,13 @@ fails here rather than at a consumer.
    package carries (a message-format version field, a chain-version handshake),
    what backward-compatibility window is promised, and how a breaking change
    reaches consumers. This is a protocol question before it is an SDK one, so it
-   needs the chain's ruling first.
+   needs the chain's ruling first. The nearest home is `timeflareio/chain` —
+   `PENDING_RELEASE_STRATEGY_PLAN.md`, which covers the consumer-facing
+   contract and asks how a consensus-breaking release is signalled; it does
+   not yet list these client-side points as a question of its own.
+   *Recommendation*: raise them there before phase 2 publishes any
+   compatibility statement, and until they are ruled document only the
+   tested sets in the chain's `COMPATIBILITY.md`.
 
 ## 5. What this plan does not solve
 
