@@ -7,6 +7,7 @@
  *   §5 identity-key backup      BIP39 (English, 24 words) over the raw
  *                               32-byte X25519 private key
  *   §8 receiving VEIL           timeflare:fund/<tmflr1…>[?amount=<uveil>]
+ *   §10 universal links         https://<link-host>/<kind>#<timeflare: URI>
  *
  * Every bech32m payload starts with a version byte; parsers encountering an
  * unknown version reject with an "update your client" error — they never
@@ -309,6 +310,120 @@ export function parseFundUri(input: string): { address: string; amountUveil?: bi
     }
   }
   return { address, amountUveil };
+}
+
+// ── §10 universal links ─────────────────────────────────────────────────────
+
+/**
+ * The path of a universal link: one word saying what was handed over, so the
+ * install page can word itself without reading a payload.
+ */
+export type UniversalLinkKind = 'key' | 'claim' | 'fund';
+
+const UNIVERSAL_LINK_KINDS: readonly UniversalLinkKind[] = ['key', 'claim', 'fund'];
+const TIMEFLARE_SCHEME = 'timeflare:';
+/** A link base: `https://` and an authority, with nothing after it. */
+const LINK_BASE_RE = /^https:\/\/([^/?#@\s]+)$/i;
+/** authority, path, query, fragment — split by hand so no runtime URL class is needed. */
+const UNIVERSAL_LINK_RE = /^https:\/\/([^/?#]*)(\/[^?#]*)?(?:\?[^#]*)?(?:#([\s\S]*))?$/i;
+
+/**
+ * Which kind a `timeflare:` URI is, having checked that it parses. A link that
+ * wraps a malformed URI would open the app on an error for whoever taps it, so
+ * the mistake is caught where the link is made.
+ */
+function universalLinkKindOf(uri: string): UniversalLinkKind {
+  const lower = uri.toLowerCase();
+  if (lower.startsWith(RECIPIENT_URI_PREFIX)) {
+    parseRecipientUri(uri);
+    return 'key';
+  }
+  if (lower.startsWith(CLAIM_URI_PREFIX)) {
+    parseClaimUri(uri);
+    return 'claim';
+  }
+  if (lower.startsWith(FUND_URI_PREFIX)) {
+    parseFundUri(uri);
+    return 'fund';
+  }
+  if (lower.startsWith(TIMEFLARE_SCHEME)) {
+    throw new ConventionError('only the recipient, claim and fund URIs have a link form');
+  }
+  throw new ConventionError(`only a full '${TIMEFLARE_SCHEME}' URI is wrapped in a link`);
+}
+
+/**
+ * Wrap a `timeflare:` URI in the `https://` link an operating system can hand
+ * to the app, or to an install page when the app is absent.
+ *
+ * The URI rides verbatim in the FRAGMENT, and only there. A browser never
+ * sends the fragment to the server, so a recipient key, an address or a claim
+ * kit handed to a phone without the app reaches no log, cache or analytics
+ * pipeline. The path carries one word of intent and no payload.
+ *
+ * `baseUrl` is `https://<host>` and nothing more — no path, no trailing slash.
+ * It is configuration, so a malformed one throws here rather than producing
+ * links that will not open.
+ *
+ * A wrapped claim URI is still key material: the link is as sensitive as the
+ * URI inside it.
+ */
+export function encodeUniversalLink(baseUrl: string, uri: string): string {
+  const base = LINK_BASE_RE.exec(baseUrl);
+  if (base === null) {
+    throw new ConventionError(
+      baseUrl.toLowerCase().startsWith('https://')
+        ? `the link base is a scheme and host only, got '${baseUrl}'`
+        : `the link base must be https, got '${baseUrl}'`,
+    );
+  }
+  const kind = universalLinkKindOf(uri);
+  return `https://${base[1].toLowerCase()}/${kind}#${uri}`;
+}
+
+/**
+ * Unwrap a universal link to the `timeflare:` URI it carries.
+ *
+ * The fragment comes back VERBATIM and unvalidated: the URI parsers above stay
+ * the only thing that decides what a payload means, so the wrapped and bare
+ * forms cannot drift. `kind` is the path, which exists for the install page's
+ * wording — route on `uri`, never on `kind`.
+ *
+ * `host` is returned lowercased, with its port if it has one, and is NOT
+ * checked: the codec knows no hosts. A caller MUST compare it against the
+ * hosts it has claimed before acting on `uri`.
+ *
+ * A query is ignored and never read. A payload anywhere but the fragment is
+ * rejected, because that is the one place a server cannot see.
+ */
+export function parseUniversalLink(input: string): {
+  host: string;
+  kind: UniversalLinkKind;
+  uri: string;
+} {
+  const match = UNIVERSAL_LINK_RE.exec(input.trim());
+  if (match === null) {
+    throw new ConventionError("not a universal link (expected 'https://…')");
+  }
+  const [, authority, path, fragment] = match;
+  if (authority === '' || /[@\s]/.test(authority)) {
+    throw new ConventionError('the authority of a universal link is a host and nothing else');
+  }
+  const kind = UNIVERSAL_LINK_KINDS.find((k) => path === `/${k}`);
+  if (kind === undefined) {
+    throw new ConventionError(
+      `the path of a universal link is exactly one of /${UNIVERSAL_LINK_KINDS.join(', /')}`,
+    );
+  }
+  if (fragment === undefined || fragment === '') {
+    throw new ConventionError(
+      'the link carries nothing — the payload rides in the fragment and nowhere else',
+    );
+  }
+  if (!fragment.toLowerCase().startsWith(TIMEFLARE_SCHEME)) {
+    throw new ConventionError(`the fragment of a universal link must be a '${TIMEFLARE_SCHEME}' URI`);
+  }
+  return { host: authority.toLowerCase(), kind, uri: fragment };
 }
 
 // ── §5 identity-key backup mnemonic ─────────────────────────────────────────

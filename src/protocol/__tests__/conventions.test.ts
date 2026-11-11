@@ -12,11 +12,13 @@ import {
   encodeClaimUri,
   encodeFundUri,
   encodeRecipientUri,
+  encodeUniversalLink,
   keyToMnemonic,
   mnemonicToKey,
   parseClaimUri,
   parseFundUri,
   parseRecipientUri,
+  parseUniversalLink,
   ConventionError,
   FUND_URI_PREFIX,
   RECIPIENT_URI_PREFIX,
@@ -49,6 +51,16 @@ interface Corpus {
     amount_uveil: string | null;
   }[];
   fund_uri_invalid: { name: string; input: string; reason: string }[];
+  universal_link: { name: string; base_url: string; uri: string; kind: string; url: string }[];
+  universal_link_parse_only: {
+    name: string;
+    input: string;
+    host: string;
+    kind: string;
+    uri: string;
+  }[];
+  universal_link_encode_invalid: { name: string; base_url: string; uri: string; reason: string }[];
+  universal_link_invalid: { name: string; input: string; reason: string }[];
 }
 
 function loadCorpus(): Corpus {
@@ -203,6 +215,46 @@ describe('client_conventions.json corpus', () => {
       expect(() => encodeFundUri(address, 0n)).toThrow(ConventionError);
       expect(() => encodeFundUri(address, -1n)).toThrow(ConventionError);
       expect(() => encodeFundUri('tmflr1notanaddress')).toThrow(ConventionError);
+    });
+  });
+
+  describe('universal link (§10)', () => {
+    test.each(corpus.universal_link)('produce: $name', (v) => {
+      expect(encodeUniversalLink(v.base_url, v.uri)).toBe(v.url);
+    });
+
+    test.each(corpus.universal_link)('round-trip: $name', (v) => {
+      const parsed = parseUniversalLink(v.url);
+      expect(parsed.uri).toBe(v.uri);
+      expect(parsed.kind).toBe(v.kind);
+      expect(`https://${parsed.host}`).toBe(v.base_url);
+    });
+
+    test.each(corpus.universal_link_parse_only)('parse: $name', (v) => {
+      expect(parseUniversalLink(v.input)).toEqual({ host: v.host, kind: v.kind, uri: v.uri });
+    });
+
+    test.each(corpus.universal_link_encode_invalid)('refuse to produce: $name', (v) => {
+      expect(() => encodeUniversalLink(v.base_url, v.uri)).toThrow(ConventionError);
+    });
+
+    test.each(corpus.universal_link_invalid)('reject: $name', (v) => {
+      expect(() => parseUniversalLink(v.input)).toThrow(ConventionError);
+    });
+
+    test('the payload is in the fragment and nowhere else', () => {
+      // What a server receives is everything before the '#'. For every link
+      // the codec can produce, that is the host and one word.
+      for (const v of corpus.universal_link) {
+        const sent = encodeUniversalLink(v.base_url, v.uri).split('#')[0];
+        expect(sent).toBe(`${v.base_url}/${v.kind}`);
+      }
+    });
+
+    test('the wrapped URI is the bare URI, byte for byte', () => {
+      for (const v of corpus.universal_link) {
+        expect(v.url.endsWith(`#${v.uri}`)).toBe(true);
+      }
     });
   });
 });

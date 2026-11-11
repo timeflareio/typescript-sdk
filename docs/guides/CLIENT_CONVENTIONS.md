@@ -29,9 +29,9 @@ by silently redefining an existing version.
 
 ## 2. URI scheme — general rules
 
-- **Scheme**: `timeflare:` (custom scheme for app deep-linking; an
-  `https://` universal-link mirror is a possible later addition and must
-  wrap, not replace, these forms).
+- **Scheme**: `timeflare:` (custom scheme for app deep-linking). The
+  `https://` universal link of §10 wraps these forms and never replaces
+  them.
 - **Binary payloads** are encoded with **bech32m** (BIP-350): checksummed,
   QR-efficient, chain-idiomatic, case-insensitive to scan. Payloads are
   kept ≤ 90 characters total so bech32m's error-detection guarantees hold —
@@ -307,7 +307,65 @@ m/44'/9733'/0'/0/0
   courier is not a wallet anyone keeps. Never "align" courier keys to this
   path — it would break every outstanding kit.
 
-## 10. Reserved / not yet pinned
+## 10. Universal links — the `https://` form
+
+A `timeflare:` URI means nothing to a phone without the app: the camera
+resolves it to nothing and the operating system offers no install prompt. A
+universal link is the same URI wrapped in an `https://` URL on a host the app
+has claimed with the operating system. With the app installed, the operating
+system hands the link to the app and the host is never contacted. Without it,
+the browser opens a static install page.
+
+```
+https://<link-host>/<kind>#<the full timeflare: URI, verbatim>
+
+kind:     key    wraps timeflare:recipient/  (§3)
+          claim  wraps timeflare:claim/      (§4)
+          fund   wraps timeflare:fund/       (§8)
+example:  https://link.timeflare.io/key#timeflare:recipient/tfid1q…
+```
+
+- **The payload rides in the fragment, and only there.** A browser never
+  sends the fragment to a server, so nothing that was shared reaches a log,
+  a cache or an analytics pipeline, and a messenger's link-preview fetch
+  discloses nothing. The path and the query MUST NOT carry payload
+  material, for any kind, including the public ones — one rule with no
+  exceptions is auditable.
+- **The link wraps; it never replaces.** The fragment is the pinned
+  `timeflare:` URI byte for byte, not a re-encoding. Unwrapping is: read the
+  fragment and hand it to the parser for that URI. There is one form, wrapped
+  or bare, and the parsers of §3, §4 and §8 stay the only thing that decides
+  what a payload means.
+- **`kind` is install-page wording, never a routing input.** It lets the
+  page say what the person was trying to do without reading a payload. A
+  client routes on the fragment alone; a path that disagrees with the
+  fragment is noise. What a server learns from an app-less open is one word
+  of intent — never identity, network or payload.
+- **Only the full URI is wrapped.** The bare forms §3 and §8 accept for
+  manual paste have no link form, and a producer MUST refuse to wrap a URI
+  that does not itself parse.
+- **A query on the link is ignored and never read.** Channels append their
+  own parameters; a client neither rejects the link for them nor takes
+  anything from them.
+- **The codec knows no hosts.** A parser returns the host it saw. A client
+  MUST check it against the hosts it has claimed before acting on the
+  fragment, and MUST accept the bare `timeflare:` forms regardless.
+- **The install page is static and runs no script.** A fragment is safe
+  from the server; it is not safe from script on the page. The browser
+  fallback leads to an install page and nothing else. No browser-side path
+  ever resolves a recipient key, a claim kit or an address.
+- **A wrapped claim URI is still key material.** §4's rules apply to the
+  link exactly as they apply to the URI inside it. On a device without the
+  app the link is opened by a browser, which keeps it in its history; the
+  channel and the device are trusted with the key as they are for the bare
+  URI.
+- **§2 still holds.** A link is untrusted input and resolves to a
+  prefilled, clearly-labelled screen that waits for confirmation.
+
+Pinned by the `universal_link*` sections of
+`testdata/vectors/client_conventions.json`.
+
+## 11. Reserved / not yet pinned
 
 - **Bulletin-board key registry** (feature plan §16.2.3): the well-known
   public-disclosure key list (signed JSON, hosted + mirrorable). Deferred —
@@ -315,6 +373,3 @@ m/44'/9733'/0'/0/0
 - Additional `timeflare:` paths (e.g. `timeflare:secret/<id>` for plain
   secret deep-links) — unreserved today; any addition lands in this
   document first.
-- **`https://` universal-link mirror** (§2): deferred, and bounded when it
-  arrives — it leads to an install page and nothing else. No browser-side
-  path ever resolves a recipient key, a claim kit or an address.
