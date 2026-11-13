@@ -6,7 +6,7 @@ encoded. These are wire formats between clients — possibly separated by
 years — not app internals.*
 
 **Status**: pinned (rulings, July 2026 — decision record in
-[planning/client-app/PENDING_MOBILE_APP_PLAN.md §16.2](../planning/client-app/PENDING_MOBILE_APP_PLAN.md)).
+`timeflareio/mobile-client` — `PENDING_MOBILE_APP_PLAN.md` §16.2).
 Consumers: the mobile client, the TypeScript SDK, the guardian daemon
 (§5 — `guardian/custody/mnemonic.go`), and any future web app/CLI. Changes
 to this document are versioned through the encodings' version bytes — never
