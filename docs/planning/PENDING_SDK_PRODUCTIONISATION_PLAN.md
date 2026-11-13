@@ -8,7 +8,7 @@
 | **Updated** | 11 November 2026 |
 | **Protocol surface** | none |
 | **Repositories** | typescript-sdk |
-| **Depends on** | `timeflareio/network` — `PENDING_TESTNET_LAUNCH_PLAN.md` (a public network, for phase 2's quickstart and standalone example); a ruling from `timeflareio/chain` on client compatibility across upgrades (§4 Q4) |
+| **Depends on** | `timeflareio/network` — `PENDING_TEST_ALPHA_PLAN.md` (a public network, for phase 2's quickstart and standalone example); a ruling from `timeflareio/chain` on client compatibility across upgrades (§4 Q4) |
 | **Related** | [DONE_PUBLICATION_FOOTPRINT_PLAN.md](done/DONE_PUBLICATION_FOOTPRINT_PLAN.md) |
 | **Open questions** | 4 (§4) |
 
